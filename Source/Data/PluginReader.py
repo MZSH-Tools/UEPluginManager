@@ -1,4 +1,5 @@
 # 插件数据读取模块
+import re
 import json
 from pathlib import Path
 from dataclasses import dataclass, field
@@ -172,7 +173,10 @@ class PluginReader:
         """解析插件文件"""
         try:
             with open(UPluginFile, "r", encoding="utf-8-sig") as F:
-                Data = json.load(F)
+                Content = F.read()
+            # 去除尾随逗号（UE 的 JSON 允许尾随逗号，标准 JSON 不允许）
+            Content = re.sub(r',(\s*[\]\}])', r'\1', Content)
+            Data = json.loads(Content)
 
             # 解析依赖插件
             Dependencies = []

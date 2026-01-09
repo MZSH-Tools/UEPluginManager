@@ -3,8 +3,8 @@ from pathlib import Path
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
     QTreeWidget, QTreeWidgetItem, QLineEdit, QComboBox, QLabel,
-    QTextEdit, QGroupBox, QCheckBox, QPushButton, QFileDialog,
-    QMessageBox, QHeaderView, QStatusBar
+    QTextEdit, QGroupBox, QCheckBox, QPushButton, QMessageBox,
+    QHeaderView, QStatusBar
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
@@ -20,6 +20,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.Manager = PluginManager()
         self._InitUI()
+        self._LoadProject(Path.cwd())
 
     def _InitUI(self):
         """初始化界面"""
@@ -57,16 +58,10 @@ class MainWindow(QMainWindow):
         """创建工具栏"""
         Layout = QHBoxLayout()
 
-        # 项目路径
+        # 项目路径（只读显示）
         Layout.addWidget(QLabel("项目:"))
-        self.ProjectPathEdit = QLineEdit()
-        self.ProjectPathEdit.setReadOnly(True)
-        self.ProjectPathEdit.setPlaceholderText("选择 UE 项目目录...")
-        Layout.addWidget(self.ProjectPathEdit, 1)
-
-        BrowseBtn = QPushButton("浏览...")
-        BrowseBtn.clicked.connect(self._OnBrowseProject)
-        Layout.addWidget(BrowseBtn)
+        self.ProjectPathLabel = QLabel()
+        Layout.addWidget(self.ProjectPathLabel, 1)
 
         Layout.addSpacing(20)
 
@@ -124,7 +119,7 @@ class MainWindow(QMainWindow):
         InfoLayout = QVBoxLayout()
 
         self.NameLabel = QLabel("名称: -")
-        self.NameLabel.setFont(QFont("", 12, QFont.Bold))
+        self.NameLabel.setFont(QFont("Microsoft YaHei", 12, QFont.Bold))
         InfoLayout.addWidget(self.NameLabel)
 
         self.PathLabel = QLabel("路径: -")
@@ -180,19 +175,12 @@ class MainWindow(QMainWindow):
 
         return GroupBox
 
-    def _OnBrowseProject(self):
-        """选择项目目录"""
-        Path_ = QFileDialog.getExistingDirectory(self, "选择 UE 项目目录")
-        if Path_:
-            self._LoadProject(Path(Path_))
-
     def _LoadProject(self, ProjectPath: Path):
         """加载项目"""
         if not self.Manager.LoadProject(ProjectPath):
-            QMessageBox.warning(self, "错误", "无法加载项目，请确保目录包含 .uproject 文件")
             return
 
-        self.ProjectPathEdit.setText(str(ProjectPath))
+        self.ProjectPathLabel.setText(str(ProjectPath))
 
         # 更新分类下拉框
         self.CategoryCombo.clear()
