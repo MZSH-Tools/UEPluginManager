@@ -11,8 +11,16 @@ class PluginManager:
     def __init__(self):
         self.Reader: Optional[PluginReader] = None
         self.ProjectInfo: Optional[ProjectInfo] = None
-        self.Plugins: list[PluginInfo] = []
-        self._FilteredPlugins: list[PluginInfo] = []
+        self.Plugins: dict[PluginSource, list[PluginInfo]] = {
+            PluginSource.Project: [],
+            PluginSource.Engine: [],
+            PluginSource.Fab: []
+        }
+        self._FilteredPlugins: dict[PluginSource, list[PluginInfo]] = {
+            PluginSource.Project: [],
+            PluginSource.Engine: [],
+            PluginSource.Fab: []
+        }
 
     def LoadProject(self, ProjectPath: Path) -> bool:
         """加载项目"""
@@ -23,78 +31,55 @@ class PluginManager:
             return False
 
         self.Plugins = self.Reader.LoadAllPlugins()
-        self._FilteredPlugins = self.Plugins.copy()
+        for Source in PluginSource:
+            self._FilteredPlugins[Source] = self.Plugins[Source].copy()
         return True
 
-    def GetPlugins(self, Source: Optional[PluginSource] = None) -> list[PluginInfo]:
-        """获取插件列表"""
-        if Source is None:
-            return self._FilteredPlugins
-        return [P for P in self._FilteredPlugins if P.Source == Source]
+    def GetPlugins(self, Source: PluginSource) -> list[PluginInfo]:
+        """获取指定来源的插件列表"""
+        return self._FilteredPlugins[Source]
 
-    def Search(self, Keyword: str, Field: int = 0) -> list[PluginInfo]:
+    def Search(self, Keyword: str, Field: int = 0):
         """搜索插件，Field: 0名称 1作者 2分类 3描述 4依赖 5被依赖"""
         if not Keyword:
-            self._FilteredPlugins = self.Plugins.copy()
+            for Source in PluginSource:
+                self._FilteredPlugins[Source] = self.Plugins[Source].copy()
         else:
             Keyword = Keyword.lower()
-            self._FilteredPlugins = []
-            for P in self.Plugins:
-                Match = False
-                if Field == 0:
-                    Match = Keyword in P.Name.lower()
-                elif Field == 1:
-                    Match = Keyword in P.CreatedBy.lower()
-                elif Field == 2:
-                    Match = Keyword in P.Category.lower()
-                elif Field == 3:
-                    Match = Keyword in P.Description.lower()
-                elif Field == 4:
-                    Match = any(Keyword in Dep.lower() for Dep in P.Plugins)
-                elif Field == 5:
-                    Match = any(Keyword in Dep.lower() for Dep in self.GetDependents(P.Name))
-                if Match:
-                    self._FilteredPlugins.append(P)
-        return self._FilteredPlugins
+            for Source in PluginSource:
+                self._FilteredPlugins[Source] = []
+                for P in self.Plugins[Source]:
+                    Match = False
+                    if Field == 0:
+                        Match = Keyword in P.Name.lower()
+                    elif Field == 1:
+                        Match = Keyword in P.CreatedBy.lower()
+                    elif Field == 2:
+                        Match = Keyword in P.Category.lower()
+                    elif Field == 3:
+                        Match = Keyword in P.Description.lower()
+                    elif Field == 4:
+                        Match = any(Keyword in Dep.lower() for Dep in P.Plugins)
+                    elif Field == 5:
+                        Match = any(Keyword in Dep.lower() for Dep in self.GetDependents(P.Name, Source))
+                    if Match:
+                        self._FilteredPlugins[Source].append(P)
 
-    def Filter(self, Source: Optional[PluginSource] = None,
-               Category: Optional[str] = None,
-               EnabledOnly: Optional[bool] = None) -> list[PluginInfo]:
-        """过滤插件"""
-        Result = self.Plugins.copy()
-
-        if Source is not None:
-            Result = [P for P in Result if P.Source == Source]
-
-        if Category:
-            Result = [P for P in Result if P.Category == Category]
-
-        if EnabledOnly is not None:
-            if EnabledOnly:
-                Result = [P for P in Result if P.EnabledInProject is True or
-                          (P.EnabledInProject is None and P.EnabledByDefault)]
-            else:
-                Result = [P for P in Result if P.EnabledInProject is False or
-                          (P.EnabledInProject is None and not P.EnabledByDefault)]
-
-        self._FilteredPlugins = Result
-        return Result
-
-    def GetCategories(self) -> list[str]:
-        """获取所有分类"""
+    def GetCategories(self, Source: PluginSource) -> list[str]:
+        """获取指定来源的所有分类"""
         Categories = set()
-        for Plugin in self.Plugins:
+        for Plugin in self.Plugins[Source]:
             if Plugin.Category:
                 Categories.add(Plugin.Category)
         return sorted(list(Categories))
 
-    def SetPluginEnabled(self, PluginName: str, Enabled: bool) -> bool:
+    def SetPluginEnabled(self, PluginName: str, Source: PluginSource, Enabled: bool) -> bool:
         """设置插件启用状态"""
         if not self.ProjectInfo:
             return False
 
         # 更新内存中的状态
-        for Plugin in self.Plugins:
+        for Plugin in self.Plugins[Source]:
             if Plugin.Name == PluginName:
                 Plugin.EnabledInProject = Enabled
                 break
@@ -147,45 +132,42 @@ class PluginManager:
             print(f"更新项目文件失败: {E}")
             return False
 
-    def GetDependencies(self, PluginName: str) -> list[str]:
+    def GetDependencies(self, PluginName: str, Source: PluginSource) -> list[str]:
         """获取插件依赖"""
-        for Plugin in self.Plugins:
+        for Plugin in self.Plugins[Source]:
             if Plugin.Name == PluginName:
                 return Plugin.Plugins
         return []
 
-    def GetDependents(self, PluginName: str) -> list[str]:
-        """获取依赖此插件的其他插件"""
+    def GetDependents(self, PluginName: str, Source: PluginSource) -> list[str]:
+        """获取依赖此插件的其他插件（在同一来源中）"""
         Dependents = []
-        for Plugin in self.Plugins:
+        for Plugin in self.Plugins[Source]:
             if PluginName in Plugin.Plugins:
                 Dependents.append(Plugin.Name)
         return Dependents
 
-    def GetPluginByName(self, Name: str) -> Optional[PluginInfo]:
-        """根据名称获取插件"""
-        for Plugin in self.Plugins:
+    def GetPluginByName(self, Name: str, Source: PluginSource) -> Optional[PluginInfo]:
+        """根据名称和来源获取插件"""
+        for Plugin in self.Plugins[Source]:
             if Plugin.Name == Name:
                 return Plugin
         return None
 
     def GetStats(self) -> dict:
         """获取统计信息"""
-        ProjectPlugins = [P for P in self.Plugins if P.Source == PluginSource.Project]
-        EnginePlugins = [P for P in self.Plugins if P.Source == PluginSource.Engine]
-        FabPlugins = [P for P in self.Plugins if P.Source == PluginSource.Fab]
-
-        EnabledCount = sum(
-            1 for P in self.Plugins
-            if P.EnabledInProject is True or
-            (P.EnabledInProject is None and P.EnabledByDefault)
-        )
+        Total = sum(len(self.Plugins[S]) for S in PluginSource)
+        EnabledCount = 0
+        for Source in PluginSource:
+            for P in self.Plugins[Source]:
+                if P.EnabledInProject is True or (P.EnabledInProject is None and P.EnabledByDefault):
+                    EnabledCount += 1
 
         return {
-            "Total": len(self.Plugins),
-            "Project": len(ProjectPlugins),
-            "Engine": len(EnginePlugins),
-            "Fab": len(FabPlugins),
+            "Total": Total,
+            "Project": len(self.Plugins[PluginSource.Project]),
+            "Engine": len(self.Plugins[PluginSource.Engine]),
+            "Fab": len(self.Plugins[PluginSource.Fab]),
             "Enabled": EnabledCount,
-            "Disabled": len(self.Plugins) - EnabledCount
+            "Disabled": Total - EnabledCount
         }

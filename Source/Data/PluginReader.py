@@ -52,7 +52,11 @@ class PluginReader:
     def __init__(self, ProjectPath: Path):
         self.ProjectPath = ProjectPath
         self.ProjectInfo: Optional[ProjectInfo] = None
-        self.Plugins: list[PluginInfo] = []
+        self.Plugins: dict[PluginSource, list[PluginInfo]] = {
+            PluginSource.Project: [],
+            PluginSource.Engine: [],
+            PluginSource.Fab: []
+        }
 
     def LoadProject(self) -> Optional[ProjectInfo]:
         """加载项目信息"""
@@ -132,15 +136,16 @@ class PluginReader:
                 return DefaultPath
             return None
 
-    def LoadAllPlugins(self) -> list[PluginInfo]:
+    def LoadAllPlugins(self) -> dict[PluginSource, list[PluginInfo]]:
         """加载所有插件"""
-        self.Plugins.clear()
+        for Source in PluginSource:
+            self.Plugins[Source].clear()
 
         if not self.ProjectInfo:
             self.LoadProject()
 
         if not self.ProjectInfo:
-            return []
+            return self.Plugins
 
         # 加载项目插件
         self._LoadPluginsFromDir(
@@ -168,7 +173,7 @@ class PluginReader:
         for UPluginFile in PluginsDir.rglob("*.uplugin"):
             Plugin = self._ParsePluginFile(UPluginFile, Source)
             if Plugin:
-                self.Plugins.append(Plugin)
+                self.Plugins[Plugin.Source].append(Plugin)
 
     def _ParsePluginFile(self, UPluginFile: Path, Source: PluginSource) -> Optional[PluginInfo]:
         """解析插件文件"""
@@ -214,10 +219,11 @@ class PluginReader:
         if not self.ProjectInfo:
             return
 
-        for Plugin in self.Plugins:
-            if Plugin.Name in self.ProjectInfo.EnabledPlugins:
-                Plugin.EnabledInProject = True
-            elif Plugin.Name in self.ProjectInfo.DisabledPlugins:
-                Plugin.EnabledInProject = False
-            else:
-                Plugin.EnabledInProject = None  # 未显式配置
+        for Source in PluginSource:
+            for Plugin in self.Plugins[Source]:
+                if Plugin.Name in self.ProjectInfo.EnabledPlugins:
+                    Plugin.EnabledInProject = True
+                elif Plugin.Name in self.ProjectInfo.DisabledPlugins:
+                    Plugin.EnabledInProject = False
+                else:
+                    Plugin.EnabledInProject = None  # 未显式配置

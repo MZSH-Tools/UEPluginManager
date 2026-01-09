@@ -10,7 +10,6 @@ from PySide6.QtGui import QFont
 
 from Source.Logic.PluginManager import PluginManager
 from Source.Data.PluginReader import PluginInfo, PluginSource
-from Source.Data.ConfigCache import ConfigCache
 
 
 class MainWindow(QMainWindow):
@@ -19,7 +18,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.Manager = PluginManager()
-        self.Config = ConfigCache()
+        self._CurSource: PluginSource = PluginSource.Project
         self._InitUI()
         self._LoadProject(Path.cwd())
 
@@ -57,8 +56,10 @@ class MainWindow(QMainWindow):
 
         # 状态栏
         self.StatusBar = QStatusBar()
-        self.StatusLabel = QLabel()
-        self.StatusBar.addPermanentWidget(self.StatusLabel)
+        self.StatusLeftLabel = QLabel()
+        self.StatusRightLabel = QLabel()
+        self.StatusBar.addWidget(self.StatusLeftLabel)
+        self.StatusBar.addPermanentWidget(self.StatusRightLabel)
         self.setStatusBar(self.StatusBar)
 
     def _CreateInfoPanel(self, ParentLayout: QVBoxLayout):
@@ -125,7 +126,6 @@ class MainWindow(QMainWindow):
         SearchLayout = QHBoxLayout()
         self.SearchFieldCombo = QComboBox()
         self.SearchFieldCombo.addItems(["名称", "作者", "分类", "描述", "依赖", "被依赖"])
-        self.SearchFieldCombo.setCurrentIndex(self.Config.Get("SearchField", 0))
         self.SearchFieldCombo.currentIndexChanged.connect(self._OnSearchFieldChanged)
         self.SearchFieldCombo.setFixedWidth(80)
         SearchLayout.addWidget(self.SearchFieldCombo)
@@ -140,13 +140,13 @@ class MainWindow(QMainWindow):
         # 标签页
         self.SourceTabs = QTabBar()
         self.SourceTabs.addTab("项目")
-        self.SourceTabs.addTab("Fab")
+        self.SourceTabs.addTab("商城")
         self.SourceTabs.addTab("引擎")
         self.SourceTabs.currentChanged.connect(self._OnTabChanged)
         Layout.addWidget(self.SourceTabs)
 
         self.PluginTree = QTreeWidget()
-        self.PluginTree.setHeaderLabels(["名称", "分类", "状态"])
+        self.PluginTree.setHeaderLabels(["名称", "作者", "分类", "状态"])
         self.PluginTree.setRootIsDecorated(False)
         self.PluginTree.setAlternatingRowColors(True)
         self.PluginTree.setSortingEnabled(True)
@@ -154,9 +154,14 @@ class MainWindow(QMainWindow):
         self.PluginTree.itemSelectionChanged.connect(self._OnPluginSelected)
 
         Header = self.PluginTree.header()
+        Header.setSectionsMovable(False)
+        Header.setStretchLastSection(False)
         Header.setSectionResizeMode(0, QHeaderView.Stretch)
-        Header.setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        Header.setSectionResizeMode(1, QHeaderView.Fixed)
         Header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        Header.setSectionResizeMode(3, QHeaderView.Fixed)
+        Header.resizeSection(1, 120)
+        Header.resizeSection(3, 80)
 
         Layout.addWidget(self.PluginTree)
 
@@ -179,8 +184,10 @@ class MainWindow(QMainWindow):
         self.PathLabel.setWordWrap(True)
         InfoLayout.addWidget(self.PathLabel)
 
-        self.VersionLabel = QLabel("版本: -")
-        InfoLayout.addWidget(self.VersionLabel)
+        self.DocsLabel = QLabel("文档: -")
+        self.DocsLabel.setOpenExternalLinks(True)
+        self.DocsLabel.setWordWrap(True)
+        InfoLayout.addWidget(self.DocsLabel)
 
         self.AuthorLabel = QLabel("作者: -")
         InfoLayout.addWidget(self.AuthorLabel)
@@ -253,9 +260,11 @@ class MainWindow(QMainWindow):
 
         # 更新状态栏
         Stats = self.Manager.GetStats()
-        self.StatusLabel.setText(
+        self.StatusLeftLabel.setText(
             f"共 {Stats['Total']} 个插件 | "
-            f"项目: {Stats['Project']} | 引擎: {Stats['Engine']} | Fab: {Stats['Fab']} | "
+            f"项目: {Stats['Project']} | 商城: {Stats['Fab']} | 引擎: {Stats['Engine']}"
+        )
+        self.StatusRightLabel.setText(
             f"已启用: {Stats['Enabled']} | 已禁用: {Stats['Disabled']}"
         )
 
@@ -273,24 +282,24 @@ class MainWindow(QMainWindow):
         self.PluginTree.clear()
 
         # 获取当前标签页对应的来源类型
-        CurSource = self._GetSourceByTabIndex(self.SourceTabs.currentIndex())
+        self._CurSource = self._GetSourceByTabIndex(self.SourceTabs.currentIndex())
 
         # 更新各标签页的匹配数
-        AllPlugins = self.Manager.GetPlugins()
-        ProjectCount = len([P for P in AllPlugins if P.Source == PluginSource.Project])
-        EngineCount = len([P for P in AllPlugins if P.Source == PluginSource.Engine])
-        FabCount = len([P for P in AllPlugins if P.Source == PluginSource.Fab])
+        ProjectCount = len(self.Manager.GetPlugins(PluginSource.Project))
+        FabCount = len(self.Manager.GetPlugins(PluginSource.Fab))
+        EngineCount = len(self.Manager.GetPlugins(PluginSource.Engine))
 
         self.SourceTabs.setTabText(0, f"项目 ({ProjectCount})")
-        self.SourceTabs.setTabText(1, f"Fab ({FabCount})")
+        self.SourceTabs.setTabText(1, f"商城 ({FabCount})")
         self.SourceTabs.setTabText(2, f"引擎 ({EngineCount})")
 
         # 只显示当前标签页类型的插件
-        Plugins = [P for P in AllPlugins if P.Source == CurSource]
+        Plugins = self.Manager.GetPlugins(self._CurSource)
         for Plugin in Plugins:
             Item = QTreeWidgetItem()
             Item.setText(0, Plugin.Name)
-            Item.setText(1, Plugin.Category or "-")
+            Item.setText(1, Plugin.CreatedBy or "-")
+            Item.setText(2, Plugin.Category or "-")
 
             # 状态
             if Plugin.EnabledInProject is True:
@@ -299,7 +308,7 @@ class MainWindow(QMainWindow):
                 Status = "禁用"
             else:
                 Status = "默认" + ("(启用)" if Plugin.EnabledByDefault else "(禁用)")
-            Item.setText(2, Status)
+            Item.setText(3, Status)
 
             Item.setData(0, Qt.UserRole, Plugin.Name)
             self.PluginTree.addTopLevelItem(Item)
@@ -309,15 +318,20 @@ class MainWindow(QMainWindow):
         Field = self.SearchFieldCombo.currentIndex()
         self.Manager.Search(Text, Field)
         self._RefreshPluginList()
+        # 如果搜索后没有结果，置灰详情面板
+        if self.PluginTree.topLevelItemCount() == 0:
+            self._ClearDetailPanel()
 
     def _OnSearchFieldChanged(self, Index: int):
         """搜索字段变更"""
-        self.Config.Set("SearchField", Index)
         self._OnSearch(self.SearchEdit.text())
 
     def _OnTabChanged(self, Index: int):
         """标签页切换"""
         self._RefreshPluginList()
+        # 如果当前标签页没有插件，置灰详情面板
+        if self.PluginTree.topLevelItemCount() == 0:
+            self._ClearDetailPanel()
 
     def _OnPluginSelected(self):
         """插件选中"""
@@ -326,7 +340,7 @@ class MainWindow(QMainWindow):
             return
 
         PluginName = Items[0].data(0, Qt.UserRole)
-        Plugin = self.Manager.GetPluginByName(PluginName)
+        Plugin = self.Manager.GetPluginByName(PluginName, self._CurSource)
         if not Plugin:
             return
 
@@ -337,17 +351,20 @@ class MainWindow(QMainWindow):
         self.DetailPanel.setEnabled(True)
         self.NameLabel.setText(f"名称: {Plugin.Name}")
         self.PathLabel.setText(f"路径: {Plugin.Path}")
-        self.VersionLabel.setText(f"版本: {Plugin.Version or '-'}")
+        if Plugin.DocsURL:
+            self.DocsLabel.setText(f'文档: <a href="{Plugin.DocsURL}">{Plugin.DocsURL}</a>')
+        else:
+            self.DocsLabel.setText("文档: -")
         self.AuthorLabel.setText(f"作者: {Plugin.CreatedBy or '-'}")
         self.CategoryLabel.setText(f"分类: {Plugin.Category or '-'}")
         self.DescriptionEdit.setText(Plugin.Description or "无描述")
 
         # 依赖
-        Dependencies = self.Manager.GetDependencies(Plugin.Name)
+        Dependencies = self.Manager.GetDependencies(Plugin.Name, self._CurSource)
         self.DependenciesEdit.setText(", ".join(Dependencies) if Dependencies else "无")
 
         # 被依赖
-        Dependents = self.Manager.GetDependents(Plugin.Name)
+        Dependents = self.Manager.GetDependents(Plugin.Name, self._CurSource)
         self.DependentsEdit.setText(", ".join(Dependents) if Dependents else "无")
 
         # 启用状态
@@ -364,19 +381,40 @@ class MainWindow(QMainWindow):
         self._CurPluginName = Plugin.Name
         self._CurPluginPath = Plugin.Path
 
+    def _ClearDetailPanel(self):
+        """清空并置灰详情面板"""
+        self.DetailPanel.setEnabled(False)
+        self.NameLabel.setText("名称: -")
+        self.PathLabel.setText("路径: -")
+        self.DocsLabel.setText("文档: -")
+        self.AuthorLabel.setText("作者: -")
+        self.CategoryLabel.setText("分类: -")
+        self.DescriptionEdit.setText("")
+        self.DependenciesEdit.setText("")
+        self.DependentsEdit.setText("")
+        self.EnabledCheck.blockSignals(True)
+        self.EnabledCheck.setChecked(False)
+        self.EnabledCheck.blockSignals(False)
+        if hasattr(self, "_CurPluginName"):
+            del self._CurPluginName
+        if hasattr(self, "_CurPluginPath"):
+            del self._CurPluginPath
+
     def _OnEnabledChanged(self, State: int):
         """启用状态变更"""
         if not hasattr(self, "_CurPluginName"):
             return
 
         Enabled = State == Qt.Checked
-        if self.Manager.SetPluginEnabled(self._CurPluginName, Enabled):
+        if self.Manager.SetPluginEnabled(self._CurPluginName, self._CurSource, Enabled):
             self._RefreshPluginList()
             # 更新状态栏
             Stats = self.Manager.GetStats()
-            self.StatusLabel.setText(
+            self.StatusLeftLabel.setText(
                 f"共 {Stats['Total']} 个插件 | "
-                f"项目: {Stats['Project']} | 引擎: {Stats['Engine']} | Fab: {Stats['Fab']} | "
+                f"项目: {Stats['Project']} | 商城: {Stats['Fab']} | 引擎: {Stats['Engine']}"
+            )
+            self.StatusRightLabel.setText(
                 f"已启用: {Stats['Enabled']} | 已禁用: {Stats['Disabled']}"
             )
         else:
