@@ -2,9 +2,8 @@
 from pathlib import Path
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
-    QTreeWidget, QTreeWidgetItem, QLineEdit, QComboBox, QLabel,
-    QTextEdit, QGroupBox, QCheckBox, QPushButton, QMessageBox,
-    QHeaderView, QStatusBar
+    QTreeWidget, QTreeWidgetItem, QLineEdit, QLabel, QTextEdit,
+    QGroupBox, QCheckBox, QPushButton, QMessageBox, QHeaderView, QStatusBar
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
@@ -58,34 +57,27 @@ class MainWindow(QMainWindow):
         """创建工具栏"""
         Layout = QHBoxLayout()
 
-        # 项目路径（只读显示）
+        # 项目目录
         Layout.addWidget(QLabel("项目:"))
         self.ProjectPathLabel = QLabel()
+        self.ProjectPathLabel.setTextInteractionFlags(Qt.TextSelectableByMouse)
         Layout.addWidget(self.ProjectPathLabel, 1)
+        self.OpenProjectBtn = QPushButton("打开")
+        self.OpenProjectBtn.setFixedWidth(50)
+        self.OpenProjectBtn.clicked.connect(self._OnOpenProjectFolder)
+        Layout.addWidget(self.OpenProjectBtn)
 
-        Layout.addSpacing(20)
+        Layout.addSpacing(10)
 
-        # 搜索框
-        Layout.addWidget(QLabel("搜索:"))
-        self.SearchEdit = QLineEdit()
-        self.SearchEdit.setPlaceholderText("输入插件名称...")
-        self.SearchEdit.textChanged.connect(self._OnSearch)
-        self.SearchEdit.setFixedWidth(200)
-        Layout.addWidget(self.SearchEdit)
-
-        # 来源筛选
-        Layout.addWidget(QLabel("来源:"))
-        self.SourceCombo = QComboBox()
-        self.SourceCombo.addItems(["全部", "项目插件", "引擎插件"])
-        self.SourceCombo.currentIndexChanged.connect(self._OnFilterChanged)
-        Layout.addWidget(self.SourceCombo)
-
-        # 分类筛选
-        Layout.addWidget(QLabel("分类:"))
-        self.CategoryCombo = QComboBox()
-        self.CategoryCombo.addItem("全部")
-        self.CategoryCombo.currentIndexChanged.connect(self._OnFilterChanged)
-        Layout.addWidget(self.CategoryCombo)
+        # 引擎目录
+        Layout.addWidget(QLabel("引擎:"))
+        self.EnginePathLabel = QLabel()
+        self.EnginePathLabel.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        Layout.addWidget(self.EnginePathLabel, 1)
+        self.OpenEngineBtn = QPushButton("打开")
+        self.OpenEngineBtn.setFixedWidth(50)
+        self.OpenEngineBtn.clicked.connect(self._OnOpenEngineFolder)
+        Layout.addWidget(self.OpenEngineBtn)
 
         return Layout
 
@@ -93,6 +85,12 @@ class MainWindow(QMainWindow):
         """创建插件列表"""
         GroupBox = QGroupBox("插件列表")
         Layout = QVBoxLayout(GroupBox)
+
+        # 搜索框
+        self.SearchEdit = QLineEdit()
+        self.SearchEdit.setPlaceholderText("搜索插件...")
+        self.SearchEdit.textChanged.connect(self._OnSearch)
+        Layout.addWidget(self.SearchEdit)
 
         self.PluginTree = QTreeWidget()
         self.PluginTree.setHeaderLabels(["名称", "来源", "分类", "状态"])
@@ -182,11 +180,14 @@ class MainWindow(QMainWindow):
 
         self.ProjectPathLabel.setText(str(ProjectPath))
 
-        # 更新分类下拉框
-        self.CategoryCombo.clear()
-        self.CategoryCombo.addItem("全部")
-        for Category in self.Manager.GetCategories():
-            self.CategoryCombo.addItem(Category)
+        # 显示引擎路径
+        Info = self.Manager.ProjectInfo
+        if Info and Info.EnginePath:
+            self.EnginePathLabel.setText(f"{Info.EngineVersion} ({Info.EnginePath})")
+        elif Info:
+            self.EnginePathLabel.setText(f"{Info.EngineVersion} (未找到)")
+        else:
+            self.EnginePathLabel.setText("-")
 
         # 刷新列表
         self._RefreshPluginList()
@@ -225,26 +226,6 @@ class MainWindow(QMainWindow):
     def _OnSearch(self, Text: str):
         """搜索"""
         self.Manager.Search(Text)
-        self._ApplyFilter()
-
-    def _OnFilterChanged(self):
-        """筛选变更"""
-        self._ApplyFilter()
-
-    def _ApplyFilter(self):
-        """应用筛选"""
-        SourceIndex = self.SourceCombo.currentIndex()
-        Source = None
-        if SourceIndex == 1:
-            Source = PluginSource.Project
-        elif SourceIndex == 2:
-            Source = PluginSource.Engine
-
-        Category = self.CategoryCombo.currentText()
-        if Category == "全部":
-            Category = None
-
-        self.Manager.Filter(Source=Source, Category=Category)
         self._RefreshPluginList()
 
     def _OnPluginSelected(self):
@@ -310,9 +291,23 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "错误", "修改失败")
 
     def _OnOpenFolder(self):
-        """打开目录"""
+        """打开插件目录"""
         if not hasattr(self, "_CurPluginPath"):
             return
-
         import subprocess
         subprocess.Popen(f'explorer "{self._CurPluginPath}"')
+
+    def _OnOpenProjectFolder(self):
+        """打开项目目录"""
+        if not self.Manager.ProjectInfo:
+            return
+        import subprocess
+        subprocess.Popen(f'explorer "{self.Manager.ProjectInfo.Path}"')
+
+    def _OnOpenEngineFolder(self):
+        """打开引擎目录"""
+        if not self.Manager.ProjectInfo or not self.Manager.ProjectInfo.EnginePath:
+            QMessageBox.warning(self, "提示", "未找到引擎目录")
+            return
+        import subprocess
+        subprocess.Popen(f'explorer "{self.Manager.ProjectInfo.EnginePath}"')
