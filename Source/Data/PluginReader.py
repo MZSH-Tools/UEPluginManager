@@ -9,8 +9,9 @@ from enum import Enum
 
 class PluginSource(Enum):
     """插件来源"""
-    Project = "Project"      # 项目插件
-    Engine = "Engine"        # 引擎插件
+    Project = "Project"  # 项目插件
+    Engine = "Engine"    # 引擎插件
+    Fab = "Fab"          # Fab 商城插件
 
 
 @dataclass
@@ -184,10 +185,15 @@ class PluginReader:
                 if Plugin.get("Enabled", True):
                     Dependencies.append(Plugin.get("Name", ""))
 
+            # 检测是否为 Fab 商城插件
+            ActualSource = Source
+            if "Marketplace" in UPluginFile.parts:
+                ActualSource = PluginSource.Fab
+
             return PluginInfo(
                 Name=UPluginFile.stem,
                 Path=UPluginFile.parent,
-                Source=Source,
+                Source=ActualSource,
                 Version=str(Data.get("Version", Data.get("VersionName", ""))),
                 Description=Data.get("Description", ""),
                 Category=Data.get("Category", ""),

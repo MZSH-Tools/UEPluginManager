@@ -162,6 +162,7 @@ class PluginManager:
         """获取统计信息"""
         ProjectPlugins = [P for P in self.Plugins if P.Source == PluginSource.Project]
         EnginePlugins = [P for P in self.Plugins if P.Source == PluginSource.Engine]
+        FabPlugins = [P for P in self.Plugins if P.Source == PluginSource.Fab]
 
         EnabledCount = sum(
             1 for P in self.Plugins
@@ -173,6 +174,7 @@ class PluginManager:
             "Total": len(self.Plugins),
             "Project": len(ProjectPlugins),
             "Engine": len(EnginePlugins),
+            "Fab": len(FabPlugins),
             "Enabled": EnabledCount,
             "Disabled": len(self.Plugins) - EnabledCount
         }

@@ -3,7 +3,7 @@ from pathlib import Path
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
     QTreeWidget, QTreeWidgetItem, QLineEdit, QLabel, QTextEdit,
-    QGroupBox, QCheckBox, QPushButton, QMessageBox, QHeaderView, QStatusBar
+    QGroupBox, QCheckBox, QPushButton, QMessageBox, QHeaderView, QStatusBar, QTabBar
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
@@ -53,31 +53,33 @@ class MainWindow(QMainWindow):
         self.StatusBar = QStatusBar()
         self.setStatusBar(self.StatusBar)
 
-    def _CreateToolBar(self) -> QHBoxLayout:
+    def _CreateToolBar(self) -> QVBoxLayout:
         """创建工具栏"""
-        Layout = QHBoxLayout()
+        Layout = QVBoxLayout()
 
         # 项目目录
-        Layout.addWidget(QLabel("项目:"))
+        ProjectRow = QHBoxLayout()
+        ProjectRow.addWidget(QLabel("项目:"))
         self.ProjectPathLabel = QLabel()
         self.ProjectPathLabel.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        Layout.addWidget(self.ProjectPathLabel, 1)
+        ProjectRow.addWidget(self.ProjectPathLabel, 1)
         self.OpenProjectBtn = QPushButton("打开")
         self.OpenProjectBtn.setFixedWidth(50)
         self.OpenProjectBtn.clicked.connect(self._OnOpenProjectFolder)
-        Layout.addWidget(self.OpenProjectBtn)
-
-        Layout.addSpacing(10)
+        ProjectRow.addWidget(self.OpenProjectBtn)
+        Layout.addLayout(ProjectRow)
 
         # 引擎目录
-        Layout.addWidget(QLabel("引擎:"))
+        EngineRow = QHBoxLayout()
+        EngineRow.addWidget(QLabel("引擎:"))
         self.EnginePathLabel = QLabel()
         self.EnginePathLabel.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        Layout.addWidget(self.EnginePathLabel, 1)
+        EngineRow.addWidget(self.EnginePathLabel, 1)
         self.OpenEngineBtn = QPushButton("打开")
         self.OpenEngineBtn.setFixedWidth(50)
         self.OpenEngineBtn.clicked.connect(self._OnOpenEngineFolder)
-        Layout.addWidget(self.OpenEngineBtn)
+        EngineRow.addWidget(self.OpenEngineBtn)
+        Layout.addLayout(EngineRow)
 
         return Layout
 
@@ -92,8 +94,16 @@ class MainWindow(QMainWindow):
         self.SearchEdit.textChanged.connect(self._OnSearch)
         Layout.addWidget(self.SearchEdit)
 
+        # 标签页
+        self.SourceTabs = QTabBar()
+        self.SourceTabs.addTab("项目")
+        self.SourceTabs.addTab("Fab")
+        self.SourceTabs.addTab("引擎")
+        self.SourceTabs.currentChanged.connect(self._OnTabChanged)
+        Layout.addWidget(self.SourceTabs)
+
         self.PluginTree = QTreeWidget()
-        self.PluginTree.setHeaderLabels(["名称", "来源", "分类", "状态"])
+        self.PluginTree.setHeaderLabels(["名称", "分类", "状态"])
         self.PluginTree.setRootIsDecorated(False)
         self.PluginTree.setAlternatingRowColors(True)
         self.PluginTree.itemSelectionChanged.connect(self._OnPluginSelected)
@@ -102,7 +112,6 @@ class MainWindow(QMainWindow):
         Header.setSectionResizeMode(0, QHeaderView.Stretch)
         Header.setSectionResizeMode(1, QHeaderView.ResizeToContents)
         Header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
-        Header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
 
         Layout.addWidget(self.PluginTree)
 
@@ -110,8 +119,9 @@ class MainWindow(QMainWindow):
 
     def _CreateDetailPanel(self) -> QWidget:
         """创建详情面板"""
-        GroupBox = QGroupBox("插件详情")
-        Layout = QVBoxLayout(GroupBox)
+        self.DetailPanel = QGroupBox("插件详情")
+        self.DetailPanel.setEnabled(False)
+        Layout = QVBoxLayout(self.DetailPanel)
 
         # 基本信息
         InfoLayout = QVBoxLayout()
@@ -171,7 +181,7 @@ class MainWindow(QMainWindow):
 
         Layout.addStretch()
 
-        return GroupBox
+        return self.DetailPanel
 
     def _LoadProject(self, ProjectPath: Path):
         """加载项目"""
@@ -196,20 +206,42 @@ class MainWindow(QMainWindow):
         Stats = self.Manager.GetStats()
         self.StatusBar.showMessage(
             f"共 {Stats['Total']} 个插件 | "
-            f"项目: {Stats['Project']} | 引擎: {Stats['Engine']} | "
+            f"项目: {Stats['Project']} | 引擎: {Stats['Engine']} | Fab: {Stats['Fab']} | "
             f"已启用: {Stats['Enabled']} | 已禁用: {Stats['Disabled']}"
         )
+
+    def _GetSourceByTabIndex(self, Index: int) -> PluginSource:
+        """根据标签页索引获取来源类型"""
+        if Index == 0:
+            return PluginSource.Project
+        elif Index == 1:
+            return PluginSource.Fab
+        else:
+            return PluginSource.Engine
 
     def _RefreshPluginList(self):
         """刷新插件列表"""
         self.PluginTree.clear()
 
-        Plugins = self.Manager.GetPlugins()
+        # 获取当前标签页对应的来源类型
+        CurSource = self._GetSourceByTabIndex(self.SourceTabs.currentIndex())
+
+        # 更新各标签页的匹配数
+        AllPlugins = self.Manager.GetPlugins()
+        ProjectCount = len([P for P in AllPlugins if P.Source == PluginSource.Project])
+        EngineCount = len([P for P in AllPlugins if P.Source == PluginSource.Engine])
+        FabCount = len([P for P in AllPlugins if P.Source == PluginSource.Fab])
+
+        self.SourceTabs.setTabText(0, f"项目 ({ProjectCount})")
+        self.SourceTabs.setTabText(1, f"Fab ({FabCount})")
+        self.SourceTabs.setTabText(2, f"引擎 ({EngineCount})")
+
+        # 只显示当前标签页类型的插件
+        Plugins = [P for P in AllPlugins if P.Source == CurSource]
         for Plugin in Plugins:
             Item = QTreeWidgetItem()
             Item.setText(0, Plugin.Name)
-            Item.setText(1, "项目" if Plugin.Source == PluginSource.Project else "引擎")
-            Item.setText(2, Plugin.Category or "-")
+            Item.setText(1, Plugin.Category or "-")
 
             # 状态
             if Plugin.EnabledInProject is True:
@@ -218,7 +250,7 @@ class MainWindow(QMainWindow):
                 Status = "禁用"
             else:
                 Status = "默认" + ("(启用)" if Plugin.EnabledByDefault else "(禁用)")
-            Item.setText(3, Status)
+            Item.setText(2, Status)
 
             Item.setData(0, Qt.UserRole, Plugin.Name)
             self.PluginTree.addTopLevelItem(Item)
@@ -226,6 +258,10 @@ class MainWindow(QMainWindow):
     def _OnSearch(self, Text: str):
         """搜索"""
         self.Manager.Search(Text)
+        self._RefreshPluginList()
+
+    def _OnTabChanged(self, Index: int):
+        """标签页切换"""
         self._RefreshPluginList()
 
     def _OnPluginSelected(self):
@@ -243,6 +279,7 @@ class MainWindow(QMainWindow):
 
     def _ShowPluginDetail(self, Plugin: PluginInfo):
         """显示插件详情"""
+        self.DetailPanel.setEnabled(True)
         self.NameLabel.setText(f"名称: {Plugin.Name}")
         self.PathLabel.setText(f"路径: {Plugin.Path}")
         self.VersionLabel.setText(f"版本: {Plugin.Version or '-'}")
@@ -284,7 +321,7 @@ class MainWindow(QMainWindow):
             Stats = self.Manager.GetStats()
             self.StatusBar.showMessage(
                 f"共 {Stats['Total']} 个插件 | "
-                f"项目: {Stats['Project']} | 引擎: {Stats['Engine']} | "
+                f"项目: {Stats['Project']} | 引擎: {Stats['Engine']} | Fab: {Stats['Fab']} | "
                 f"已启用: {Stats['Enabled']} | 已禁用: {Stats['Disabled']}"
             )
         else:
