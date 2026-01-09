@@ -33,71 +33,88 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(CentralWidget)
         MainLayout = QVBoxLayout(CentralWidget)
 
-        # 顶部工具栏
-        ToolBar = self._CreateToolBar()
-        MainLayout.addLayout(ToolBar)
-
-        # 主内容区（左右分栏）
+        # 左右分栏
         Splitter = QSplitter(Qt.Horizontal)
 
-        # 左侧：插件列表
-        LeftPanel = self._CreatePluginList()
-        Splitter.addWidget(LeftPanel)
+        # 左侧：信息区 + 插件列表
+        LeftWidget = QWidget()
+        LeftLayout = QVBoxLayout(LeftWidget)
+        LeftLayout.setContentsMargins(0, 0, 0, 0)
+        self._CreateInfoPanel(LeftLayout)
+        LeftLayout.addWidget(self._CreatePluginList())
+        Splitter.addWidget(LeftWidget)
 
-        # 右侧：详情面板
-        RightPanel = self._CreateDetailPanel()
-        Splitter.addWidget(RightPanel)
+        # 右侧：重新加载 + 插件详情
+        RightWidget = QWidget()
+        RightLayout = QVBoxLayout(RightWidget)
+        RightLayout.setContentsMargins(0, 0, 0, 0)
+        self._CreateButtonRow(RightLayout)
+        RightLayout.addWidget(self._CreateDetailPanel())
+        Splitter.addWidget(RightWidget)
 
         Splitter.setSizes([600, 400])
         MainLayout.addWidget(Splitter)
 
         # 状态栏
         self.StatusBar = QStatusBar()
+        self.StatusLabel = QLabel()
+        self.StatusBar.addPermanentWidget(self.StatusLabel)
         self.setStatusBar(self.StatusBar)
 
-    def _CreateToolBar(self) -> QVBoxLayout:
-        """创建工具栏"""
-        Layout = QVBoxLayout()
-
+    def _CreateInfoPanel(self, ParentLayout: QVBoxLayout):
+        """创建项目信息区"""
         # 项目信息
         ProjectRow = QHBoxLayout()
-        ProjectNameTitle = QLabel("项目名称:")
-        ProjectNameTitle.setFixedWidth(60)
-        ProjectRow.addWidget(ProjectNameTitle)
+        LblProjectName = QLabel("项目名称:")
+        LblProjectName.setFixedWidth(60)
+        ProjectRow.addWidget(LblProjectName)
         self.ProjectNameLabel = QLabel()
-        self.ProjectNameLabel.setFixedWidth(150)
+        self.ProjectNameLabel.setFixedWidth(120)
         ProjectRow.addWidget(self.ProjectNameLabel)
-        ProjectDirTitle = QLabel("项目目录:")
-        ProjectDirTitle.setFixedWidth(60)
-        ProjectRow.addWidget(ProjectDirTitle)
+        LblProjectDir = QLabel("目录:")
+        LblProjectDir.setFixedWidth(30)
+        ProjectRow.addWidget(LblProjectDir)
         self.ProjectPathLabel = QLabel()
         self.ProjectPathLabel.setTextInteractionFlags(Qt.TextSelectableByMouse)
         ProjectRow.addWidget(self.ProjectPathLabel, 1)
         self.OpenProjectBtn = QPushButton("打开目录")
         self.OpenProjectBtn.clicked.connect(self._OnOpenProjectFolder)
         ProjectRow.addWidget(self.OpenProjectBtn)
-        Layout.addLayout(ProjectRow)
+        ParentLayout.addLayout(ProjectRow)
 
         # 引擎信息
         EngineRow = QHBoxLayout()
-        EngineNameTitle = QLabel("引擎名称:")
-        EngineNameTitle.setFixedWidth(60)
-        EngineRow.addWidget(EngineNameTitle)
+        LblEngineName = QLabel("引擎名称:")
+        LblEngineName.setFixedWidth(60)
+        EngineRow.addWidget(LblEngineName)
         self.EngineVersionLabel = QLabel()
-        self.EngineVersionLabel.setFixedWidth(150)
+        self.EngineVersionLabel.setFixedWidth(120)
         EngineRow.addWidget(self.EngineVersionLabel)
-        EngineDirTitle = QLabel("引擎目录:")
-        EngineDirTitle.setFixedWidth(60)
-        EngineRow.addWidget(EngineDirTitle)
+        LblEngineDir = QLabel("目录:")
+        LblEngineDir.setFixedWidth(30)
+        EngineRow.addWidget(LblEngineDir)
         self.EnginePathLabel = QLabel()
         self.EnginePathLabel.setTextInteractionFlags(Qt.TextSelectableByMouse)
         EngineRow.addWidget(self.EnginePathLabel, 1)
         self.OpenEngineBtn = QPushButton("打开目录")
         self.OpenEngineBtn.clicked.connect(self._OnOpenEngineFolder)
         EngineRow.addWidget(self.OpenEngineBtn)
-        Layout.addLayout(EngineRow)
+        ParentLayout.addLayout(EngineRow)
 
-        return Layout
+    def _CreateButtonRow(self, ParentLayout: QVBoxLayout):
+        """创建按钮行"""
+        Container = QWidget()
+        Container.setFixedHeight(52)
+        Layout = QVBoxLayout(Container)
+        Layout.setContentsMargins(0, 0, 0, 0)
+        Row = QHBoxLayout()
+        Row.addStretch()
+        self.ReloadBtn = QPushButton("重新加载")
+        self.ReloadBtn.clicked.connect(self._OnReload)
+        Row.addWidget(self.ReloadBtn)
+        Layout.addLayout(Row)
+        Layout.addStretch()
+        ParentLayout.addWidget(Container)
 
     def _CreatePluginList(self) -> QWidget:
         """创建插件列表"""
@@ -236,7 +253,7 @@ class MainWindow(QMainWindow):
 
         # 更新状态栏
         Stats = self.Manager.GetStats()
-        self.StatusBar.showMessage(
+        self.StatusLabel.setText(
             f"共 {Stats['Total']} 个插件 | "
             f"项目: {Stats['Project']} | 引擎: {Stats['Engine']} | Fab: {Stats['Fab']} | "
             f"已启用: {Stats['Enabled']} | 已禁用: {Stats['Disabled']}"
@@ -357,7 +374,7 @@ class MainWindow(QMainWindow):
             self._RefreshPluginList()
             # 更新状态栏
             Stats = self.Manager.GetStats()
-            self.StatusBar.showMessage(
+            self.StatusLabel.setText(
                 f"共 {Stats['Total']} 个插件 | "
                 f"项目: {Stats['Project']} | 引擎: {Stats['Engine']} | Fab: {Stats['Fab']} | "
                 f"已启用: {Stats['Enabled']} | 已禁用: {Stats['Disabled']}"
@@ -386,3 +403,9 @@ class MainWindow(QMainWindow):
             return
         import subprocess
         subprocess.Popen(f'explorer "{self.Manager.ProjectInfo.EnginePath}"')
+
+    def _OnReload(self):
+        """重新加载插件"""
+        if not self.Manager.ProjectInfo:
+            return
+        self._LoadProject(self.Manager.ProjectInfo.Path)
