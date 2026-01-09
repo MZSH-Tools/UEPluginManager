@@ -59,7 +59,7 @@ class PluginReader:
             return None
 
         UProjectFile = UProjectFiles[0]
-        with open(UProjectFile, "r", encoding="utf-8") as F:
+        with open(UProjectFile, "r", encoding="utf-8-sig") as F:
             Data = json.load(F)
 
         # 解析引擎版本
@@ -171,7 +171,7 @@ class PluginReader:
     def _ParsePluginFile(self, UPluginFile: Path, Source: PluginSource) -> Optional[PluginInfo]:
         """解析插件文件"""
         try:
-            with open(UPluginFile, "r", encoding="utf-8") as F:
+            with open(UPluginFile, "r", encoding="utf-8-sig") as F:
                 Data = json.load(F)
 
             # 解析依赖插件
