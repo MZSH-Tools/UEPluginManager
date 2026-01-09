@@ -66,5 +66,7 @@ venv.bak/
 # Windows
 nul
 
+=*
+
 # Test
 Test.py

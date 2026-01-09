@@ -3,13 +3,14 @@ from pathlib import Path
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
     QTreeWidget, QTreeWidgetItem, QLineEdit, QLabel, QTextEdit,
-    QGroupBox, QCheckBox, QPushButton, QMessageBox, QHeaderView, QStatusBar, QTabBar
+    QGroupBox, QCheckBox, QPushButton, QMessageBox, QHeaderView, QStatusBar, QTabBar, QComboBox
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
 
 from Source.Logic.PluginManager import PluginManager
 from Source.Data.PluginReader import PluginInfo, PluginSource
+from Source.Data.ConfigCache import ConfigCache
 
 
 class MainWindow(QMainWindow):
@@ -18,6 +19,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.Manager = PluginManager()
+        self.Config = ConfigCache()
         self._InitUI()
         self._LoadProject(Path.cwd())
 
@@ -57,26 +59,40 @@ class MainWindow(QMainWindow):
         """创建工具栏"""
         Layout = QVBoxLayout()
 
-        # 项目目录
+        # 项目信息
         ProjectRow = QHBoxLayout()
-        ProjectRow.addWidget(QLabel("项目:"))
+        ProjectNameTitle = QLabel("项目名称:")
+        ProjectNameTitle.setFixedWidth(60)
+        ProjectRow.addWidget(ProjectNameTitle)
+        self.ProjectNameLabel = QLabel()
+        self.ProjectNameLabel.setFixedWidth(150)
+        ProjectRow.addWidget(self.ProjectNameLabel)
+        ProjectDirTitle = QLabel("项目目录:")
+        ProjectDirTitle.setFixedWidth(60)
+        ProjectRow.addWidget(ProjectDirTitle)
         self.ProjectPathLabel = QLabel()
         self.ProjectPathLabel.setTextInteractionFlags(Qt.TextSelectableByMouse)
         ProjectRow.addWidget(self.ProjectPathLabel, 1)
-        self.OpenProjectBtn = QPushButton("打开")
-        self.OpenProjectBtn.setFixedWidth(50)
+        self.OpenProjectBtn = QPushButton("打开目录")
         self.OpenProjectBtn.clicked.connect(self._OnOpenProjectFolder)
         ProjectRow.addWidget(self.OpenProjectBtn)
         Layout.addLayout(ProjectRow)
 
-        # 引擎目录
+        # 引擎信息
         EngineRow = QHBoxLayout()
-        EngineRow.addWidget(QLabel("引擎:"))
+        EngineNameTitle = QLabel("引擎名称:")
+        EngineNameTitle.setFixedWidth(60)
+        EngineRow.addWidget(EngineNameTitle)
+        self.EngineVersionLabel = QLabel()
+        self.EngineVersionLabel.setFixedWidth(150)
+        EngineRow.addWidget(self.EngineVersionLabel)
+        EngineDirTitle = QLabel("引擎目录:")
+        EngineDirTitle.setFixedWidth(60)
+        EngineRow.addWidget(EngineDirTitle)
         self.EnginePathLabel = QLabel()
         self.EnginePathLabel.setTextInteractionFlags(Qt.TextSelectableByMouse)
         EngineRow.addWidget(self.EnginePathLabel, 1)
-        self.OpenEngineBtn = QPushButton("打开")
-        self.OpenEngineBtn.setFixedWidth(50)
+        self.OpenEngineBtn = QPushButton("打开目录")
         self.OpenEngineBtn.clicked.connect(self._OnOpenEngineFolder)
         EngineRow.addWidget(self.OpenEngineBtn)
         Layout.addLayout(EngineRow)
@@ -88,11 +104,21 @@ class MainWindow(QMainWindow):
         GroupBox = QGroupBox("插件列表")
         Layout = QVBoxLayout(GroupBox)
 
-        # 搜索框
+        # 搜索栏
+        SearchLayout = QHBoxLayout()
+        self.SearchFieldCombo = QComboBox()
+        self.SearchFieldCombo.addItems(["名称", "作者", "分类", "描述", "依赖", "被依赖"])
+        self.SearchFieldCombo.setCurrentIndex(self.Config.Get("SearchField", 0))
+        self.SearchFieldCombo.currentIndexChanged.connect(self._OnSearchFieldChanged)
+        self.SearchFieldCombo.setFixedWidth(80)
+        SearchLayout.addWidget(self.SearchFieldCombo)
+
         self.SearchEdit = QLineEdit()
         self.SearchEdit.setPlaceholderText("搜索插件...")
+        self.SearchEdit.setClearButtonEnabled(True)
         self.SearchEdit.textChanged.connect(self._OnSearch)
-        Layout.addWidget(self.SearchEdit)
+        SearchLayout.addWidget(self.SearchEdit)
+        Layout.addLayout(SearchLayout)
 
         # 标签页
         self.SourceTabs = QTabBar()
@@ -106,6 +132,8 @@ class MainWindow(QMainWindow):
         self.PluginTree.setHeaderLabels(["名称", "分类", "状态"])
         self.PluginTree.setRootIsDecorated(False)
         self.PluginTree.setAlternatingRowColors(True)
+        self.PluginTree.setSortingEnabled(True)
+        self.PluginTree.sortByColumn(0, Qt.AscendingOrder)
         self.PluginTree.itemSelectionChanged.connect(self._OnPluginSelected)
 
         Header = self.PluginTree.header()
@@ -188,15 +216,19 @@ class MainWindow(QMainWindow):
         if not self.Manager.LoadProject(ProjectPath):
             return
 
+        Info = self.Manager.ProjectInfo
+        self.ProjectNameLabel.setText(Info.Name if Info else "-")
         self.ProjectPathLabel.setText(str(ProjectPath))
 
-        # 显示引擎路径
-        Info = self.Manager.ProjectInfo
+        # 显示引擎信息
         if Info and Info.EnginePath:
-            self.EnginePathLabel.setText(f"{Info.EngineVersion} ({Info.EnginePath})")
+            self.EngineVersionLabel.setText(Info.EngineVersion)
+            self.EnginePathLabel.setText(str(Info.EnginePath))
         elif Info:
-            self.EnginePathLabel.setText(f"{Info.EngineVersion} (未找到)")
+            self.EngineVersionLabel.setText(Info.EngineVersion)
+            self.EnginePathLabel.setText("未找到")
         else:
+            self.EngineVersionLabel.setText("-")
             self.EnginePathLabel.setText("-")
 
         # 刷新列表
@@ -257,8 +289,14 @@ class MainWindow(QMainWindow):
 
     def _OnSearch(self, Text: str):
         """搜索"""
-        self.Manager.Search(Text)
+        Field = self.SearchFieldCombo.currentIndex()
+        self.Manager.Search(Text, Field)
         self._RefreshPluginList()
+
+    def _OnSearchFieldChanged(self, Index: int):
+        """搜索字段变更"""
+        self.Config.Set("SearchField", Index)
+        self._OnSearch(self.SearchEdit.text())
 
     def _OnTabChanged(self, Index: int):
         """标签页切换"""

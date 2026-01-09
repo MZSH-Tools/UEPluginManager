@@ -32,18 +32,29 @@ class PluginManager:
             return self._FilteredPlugins
         return [P for P in self._FilteredPlugins if P.Source == Source]
 
-    def Search(self, Keyword: str) -> list[PluginInfo]:
-        """搜索插件"""
+    def Search(self, Keyword: str, Field: int = 0) -> list[PluginInfo]:
+        """搜索插件，Field: 0名称 1作者 2分类 3描述 4依赖 5被依赖"""
         if not Keyword:
             self._FilteredPlugins = self.Plugins.copy()
         else:
             Keyword = Keyword.lower()
-            self._FilteredPlugins = [
-                P for P in self.Plugins
-                if Keyword in P.Name.lower()
-                or Keyword in P.Description.lower()
-                or Keyword in P.Category.lower()
-            ]
+            self._FilteredPlugins = []
+            for P in self.Plugins:
+                Match = False
+                if Field == 0:
+                    Match = Keyword in P.Name.lower()
+                elif Field == 1:
+                    Match = Keyword in P.CreatedBy.lower()
+                elif Field == 2:
+                    Match = Keyword in P.Category.lower()
+                elif Field == 3:
+                    Match = Keyword in P.Description.lower()
+                elif Field == 4:
+                    Match = any(Keyword in Dep.lower() for Dep in P.Plugins)
+                elif Field == 5:
+                    Match = any(Keyword in Dep.lower() for Dep in self.GetDependents(P.Name))
+                if Match:
+                    self._FilteredPlugins.append(P)
         return self._FilteredPlugins
 
     def Filter(self, Source: Optional[PluginSource] = None,
