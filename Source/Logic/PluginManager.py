@@ -147,6 +147,57 @@ class PluginManager:
                 Dependents.append(Plugin.Name)
         return Dependents
 
+    def GetAllDependents(self, PluginName: str) -> list[tuple[str, PluginSource]]:
+        """获取所有来源中依赖此插件的插件列表"""
+        Dependents = []
+        for Source in PluginSource:
+            for Plugin in self.Plugins[Source]:
+                if PluginName in Plugin.Plugins:
+                    Dependents.append((Plugin.Name, Source))
+        return Dependents
+
+    def GetAllDependencies(self, PluginName: str, Source: PluginSource) -> list[tuple[str, PluginSource]]:
+        """获取插件的所有依赖（跨来源查找）"""
+        Plugin = self.GetPluginByName(PluginName, Source)
+        if not Plugin:
+            return []
+
+        Dependencies = []
+        for DepName in Plugin.Plugins:
+            for S in PluginSource:
+                DepPlugin = self.GetPluginByName(DepName, S)
+                if DepPlugin:
+                    Dependencies.append((DepName, S))
+                    break
+        return Dependencies
+
+    def IsPluginEnabled(self, PluginName: str, Source: PluginSource) -> bool:
+        """检查插件是否启用"""
+        Plugin = self.GetPluginByName(PluginName, Source)
+        if not Plugin:
+            return False
+        if Plugin.EnabledInProject is True:
+            return True
+        if Plugin.EnabledInProject is False:
+            return False
+        return Plugin.EnabledByDefault
+
+    def GetDisabledDependents(self, PluginName: str) -> list[tuple[str, PluginSource]]:
+        """获取所有依赖此插件且当前启用的插件（禁用时需连带禁用）"""
+        Result = []
+        for Name, Source in self.GetAllDependents(PluginName):
+            if self.IsPluginEnabled(Name, Source):
+                Result.append((Name, Source))
+        return Result
+
+    def GetDisabledDependencies(self, PluginName: str, Source: PluginSource) -> list[tuple[str, PluginSource]]:
+        """获取插件依赖中当前未启用的插件（启用时需连带启用）"""
+        Result = []
+        for DepName, DepSource in self.GetAllDependencies(PluginName, Source):
+            if not self.IsPluginEnabled(DepName, DepSource):
+                Result.append((DepName, DepSource))
+        return Result
+
     def GetPluginByName(self, Name: str, Source: PluginSource) -> Optional[PluginInfo]:
         """根据名称和来源获取插件"""
         for Plugin in self.Plugins[Source]:
