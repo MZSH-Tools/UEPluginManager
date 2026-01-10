@@ -16,7 +16,7 @@ class PluginManager:
             PluginSource.Engine: [],
             PluginSource.Fab: []
         }
-        self._FilteredPlugins: dict[PluginSource, list[PluginInfo]] = {
+        self.FilteredPlugins: dict[PluginSource, list[PluginInfo]] = {
             PluginSource.Project: [],
             PluginSource.Engine: [],
             PluginSource.Fab: []
@@ -32,22 +32,22 @@ class PluginManager:
 
         self.Plugins = self.Reader.LoadAllPlugins()
         for Source in PluginSource:
-            self._FilteredPlugins[Source] = self.Plugins[Source].copy()
+            self.FilteredPlugins[Source] = self.Plugins[Source].copy()
         return True
 
     def GetPlugins(self, Source: PluginSource) -> list[PluginInfo]:
         """获取指定来源的插件列表"""
-        return self._FilteredPlugins[Source]
+        return self.FilteredPlugins[Source]
 
     def Search(self, Keyword: str, Field: int = 0):
         """搜索插件，Field: 0名称 1作者 2分类 3描述 4依赖 5被依赖"""
         if not Keyword:
             for Source in PluginSource:
-                self._FilteredPlugins[Source] = self.Plugins[Source].copy()
+                self.FilteredPlugins[Source] = self.Plugins[Source].copy()
         else:
             Keyword = Keyword.lower()
             for Source in PluginSource:
-                self._FilteredPlugins[Source] = []
+                self.FilteredPlugins[Source] = []
                 for P in self.Plugins[Source]:
                     Match = False
                     if Field == 0:
@@ -63,7 +63,7 @@ class PluginManager:
                     elif Field == 5:
                         Match = any(Keyword in Dep.lower() for Dep in self.GetDependents(P.Name, Source))
                     if Match:
-                        self._FilteredPlugins[Source].append(P)
+                        self.FilteredPlugins[Source].append(P)
 
     def GetCategories(self, Source: PluginSource) -> list[str]:
         """获取指定来源的所有分类"""
@@ -85,9 +85,9 @@ class PluginManager:
                 break
 
         # 更新项目文件
-        return self._UpdateProjectFile(PluginName, Enabled)
+        return self.UpdateProjectFile(PluginName, Enabled)
 
-    def _UpdateProjectFile(self, PluginName: str, Enabled: bool) -> bool:
+    def UpdateProjectFile(self, PluginName: str, Enabled: bool) -> bool:
         """更新项目文件中的插件状态"""
         if not self.ProjectInfo:
             return False

@@ -18,11 +18,11 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.Manager = PluginManager()
-        self._CurSource: PluginSource = PluginSource.Project
-        self._InitUI()
-        self._LoadProject(Path.cwd())
+        self.CurSource: PluginSource = PluginSource.Project
+        self.InitUI()
+        self.LoadProject(Path.cwd())
 
-    def _InitUI(self):
+    def InitUI(self):
         """初始化界面"""
         self.setWindowTitle("UE Plugin Manager")
         self.setMinimumSize(1200, 700)
@@ -39,16 +39,16 @@ class MainWindow(QMainWindow):
         LeftWidget = QWidget()
         LeftLayout = QVBoxLayout(LeftWidget)
         LeftLayout.setContentsMargins(0, 0, 0, 0)
-        self._CreateInfoPanel(LeftLayout)
-        LeftLayout.addWidget(self._CreatePluginList())
+        self.CreateInfoPanel(LeftLayout)
+        LeftLayout.addWidget(self.CreatePluginList())
         Splitter.addWidget(LeftWidget)
 
         # 右侧：重新加载 + 插件详情
         RightWidget = QWidget()
         RightLayout = QVBoxLayout(RightWidget)
         RightLayout.setContentsMargins(0, 0, 0, 0)
-        self._CreateButtonRow(RightLayout)
-        RightLayout.addWidget(self._CreateDetailPanel())
+        self.CreateButtonRow(RightLayout)
+        RightLayout.addWidget(self.CreateDetailPanel())
         Splitter.addWidget(RightWidget)
 
         Splitter.setSizes([600, 400])
@@ -62,7 +62,7 @@ class MainWindow(QMainWindow):
         self.StatusBar.addPermanentWidget(self.StatusRightLabel)
         self.setStatusBar(self.StatusBar)
 
-    def _CreateInfoPanel(self, ParentLayout: QVBoxLayout):
+    def CreateInfoPanel(self, ParentLayout: QVBoxLayout):
         """创建项目信息区"""
         # 项目信息
         ProjectRow = QHBoxLayout()
@@ -79,7 +79,7 @@ class MainWindow(QMainWindow):
         self.ProjectPathLabel.setTextInteractionFlags(Qt.TextSelectableByMouse)
         ProjectRow.addWidget(self.ProjectPathLabel, 1)
         self.OpenProjectBtn = QPushButton("打开目录")
-        self.OpenProjectBtn.clicked.connect(self._OnOpenProjectFolder)
+        self.OpenProjectBtn.clicked.connect(self.OnOpenProjectFolder)
         ProjectRow.addWidget(self.OpenProjectBtn)
         ParentLayout.addLayout(ProjectRow)
 
@@ -98,11 +98,11 @@ class MainWindow(QMainWindow):
         self.EnginePathLabel.setTextInteractionFlags(Qt.TextSelectableByMouse)
         EngineRow.addWidget(self.EnginePathLabel, 1)
         self.OpenEngineBtn = QPushButton("打开目录")
-        self.OpenEngineBtn.clicked.connect(self._OnOpenEngineFolder)
+        self.OpenEngineBtn.clicked.connect(self.OnOpenEngineFolder)
         EngineRow.addWidget(self.OpenEngineBtn)
         ParentLayout.addLayout(EngineRow)
 
-    def _CreateButtonRow(self, ParentLayout: QVBoxLayout):
+    def CreateButtonRow(self, ParentLayout: QVBoxLayout):
         """创建按钮行"""
         Container = QWidget()
         Container.setFixedHeight(52)
@@ -111,13 +111,13 @@ class MainWindow(QMainWindow):
         Row = QHBoxLayout()
         Row.addStretch()
         self.ReloadBtn = QPushButton("重新加载")
-        self.ReloadBtn.clicked.connect(self._OnReload)
+        self.ReloadBtn.clicked.connect(self.OnReload)
         Row.addWidget(self.ReloadBtn)
         Layout.addLayout(Row)
         Layout.addStretch()
         ParentLayout.addWidget(Container)
 
-    def _CreatePluginList(self) -> QWidget:
+    def CreatePluginList(self) -> QWidget:
         """创建插件列表"""
         GroupBox = QGroupBox("插件列表")
         Layout = QVBoxLayout(GroupBox)
@@ -126,14 +126,14 @@ class MainWindow(QMainWindow):
         SearchLayout = QHBoxLayout()
         self.SearchFieldCombo = QComboBox()
         self.SearchFieldCombo.addItems(["名称", "作者", "分类", "描述", "依赖", "被依赖"])
-        self.SearchFieldCombo.currentIndexChanged.connect(self._OnSearchFieldChanged)
+        self.SearchFieldCombo.currentIndexChanged.connect(self.OnSearchFieldChanged)
         self.SearchFieldCombo.setFixedWidth(80)
         SearchLayout.addWidget(self.SearchFieldCombo)
 
         self.SearchEdit = QLineEdit()
         self.SearchEdit.setPlaceholderText("搜索插件...")
         self.SearchEdit.setClearButtonEnabled(True)
-        self.SearchEdit.textChanged.connect(self._OnSearch)
+        self.SearchEdit.textChanged.connect(self.OnSearch)
         SearchLayout.addWidget(self.SearchEdit)
         Layout.addLayout(SearchLayout)
 
@@ -142,7 +142,7 @@ class MainWindow(QMainWindow):
         self.SourceTabs.addTab("项目")
         self.SourceTabs.addTab("商城")
         self.SourceTabs.addTab("引擎")
-        self.SourceTabs.currentChanged.connect(self._OnTabChanged)
+        self.SourceTabs.currentChanged.connect(self.OnTabChanged)
         Layout.addWidget(self.SourceTabs)
 
         self.PluginTree = QTreeWidget()
@@ -151,7 +151,7 @@ class MainWindow(QMainWindow):
         self.PluginTree.setAlternatingRowColors(True)
         self.PluginTree.setSortingEnabled(True)
         self.PluginTree.sortByColumn(0, Qt.AscendingOrder)
-        self.PluginTree.itemSelectionChanged.connect(self._OnPluginSelected)
+        self.PluginTree.itemSelectionChanged.connect(self.OnPluginSelected)
 
         Header = self.PluginTree.header()
         Header.setSectionsMovable(False)
@@ -167,7 +167,7 @@ class MainWindow(QMainWindow):
 
         return GroupBox
 
-    def _CreateDetailPanel(self) -> QWidget:
+    def CreateDetailPanel(self) -> QWidget:
         """创建详情面板"""
         self.DetailPanel = QGroupBox("插件详情")
         self.DetailPanel.setEnabled(False)
@@ -221,11 +221,11 @@ class MainWindow(QMainWindow):
         # 启用控制
         ControlLayout = QHBoxLayout()
         self.EnabledCheck = QCheckBox("在项目中启用")
-        self.EnabledCheck.stateChanged.connect(self._OnEnabledChanged)
+        self.EnabledCheck.stateChanged.connect(self.OnEnabledChanged)
         ControlLayout.addWidget(self.EnabledCheck)
 
         self.OpenFolderBtn = QPushButton("打开目录")
-        self.OpenFolderBtn.clicked.connect(self._OnOpenFolder)
+        self.OpenFolderBtn.clicked.connect(self.OnOpenFolder)
         ControlLayout.addWidget(self.OpenFolderBtn)
 
         ControlLayout.addStretch()
@@ -235,7 +235,7 @@ class MainWindow(QMainWindow):
 
         return self.DetailPanel
 
-    def _LoadProject(self, ProjectPath: Path, AutoSelect: bool = True):
+    def LoadProject(self, ProjectPath: Path, AutoSelect: bool = True):
         """加载项目"""
         if not self.Manager.LoadProject(ProjectPath):
             return
@@ -256,14 +256,14 @@ class MainWindow(QMainWindow):
             self.EnginePathLabel.setText("-")
 
         # 刷新列表
-        self._RefreshPluginList()
+        self.RefreshPluginList()
         if AutoSelect:
-            self._SelectFirstOrClear()
+            self.SelectFirstOrClear()
 
         # 更新状态栏
-        self._UpdateStatusBar()
+        self.UpdateStatusBar()
 
-    def _GetSourceByTabIndex(self, Index: int) -> PluginSource:
+    def GetSourceByTabIndex(self, Index: int) -> PluginSource:
         """根据标签页索引获取来源类型"""
         if Index == 0:
             return PluginSource.Project
@@ -272,7 +272,7 @@ class MainWindow(QMainWindow):
         else:
             return PluginSource.Engine
 
-    def _RefreshPluginList(self):
+    def RefreshPluginList(self):
         """刷新插件列表（不改变选中状态）"""
         # 阻止信号，防止 clear() 触发不必要的事件
         self.PluginTree.blockSignals(True)
@@ -280,7 +280,7 @@ class MainWindow(QMainWindow):
         self.PluginTree.blockSignals(False)
 
         # 获取当前标签页对应的来源类型
-        self._CurSource = self._GetSourceByTabIndex(self.SourceTabs.currentIndex())
+        self.CurSource = self.GetSourceByTabIndex(self.SourceTabs.currentIndex())
 
         # 更新各标签页的匹配数
         ProjectCount = len(self.Manager.GetPlugins(PluginSource.Project))
@@ -292,7 +292,7 @@ class MainWindow(QMainWindow):
         self.SourceTabs.setTabText(2, f"引擎 ({EngineCount})")
 
         # 只显示当前标签页类型的插件
-        Plugins = self.Manager.GetPlugins(self._CurSource)
+        Plugins = self.Manager.GetPlugins(self.CurSource)
         for Plugin in Plugins:
             Item = QTreeWidgetItem()
             Item.setText(0, Plugin.Name)
@@ -311,60 +311,60 @@ class MainWindow(QMainWindow):
             Item.setData(0, Qt.UserRole, Plugin.Name)
             self.PluginTree.addTopLevelItem(Item)
 
-    def _SelectFirstOrClear(self):
+    def SelectFirstOrClear(self):
         """选中第一个插件，如果列表为空则置灰详情面板"""
         if self.PluginTree.topLevelItemCount() > 0:
             self.PluginTree.setCurrentItem(self.PluginTree.topLevelItem(0))
         else:
-            self._ClearDetailPanel()
+            self.ClearDetailPanel()
 
-    def _TryReselectOrFirst(self):
+    def TryReselectOrFirst(self):
         """尝试重新选中当前插件，失败则选第一个或置灰"""
         if self.PluginTree.topLevelItemCount() == 0:
-            self._ClearDetailPanel()
+            self.ClearDetailPanel()
             return
 
         # 尝试重新选中之前的插件
-        if hasattr(self, "_CurPluginName"):
+        if hasattr(self, "CurPluginName"):
             for i in range(self.PluginTree.topLevelItemCount()):
                 Item = self.PluginTree.topLevelItem(i)
-                if Item.data(0, Qt.UserRole) == self._CurPluginName:
+                if Item.data(0, Qt.UserRole) == self.CurPluginName:
                     self.PluginTree.setCurrentItem(Item)
                     return
 
         # 找不到就选第一个
         self.PluginTree.setCurrentItem(self.PluginTree.topLevelItem(0))
 
-    def _OnSearch(self, Text: str):
+    def OnSearch(self, Text: str):
         """搜索"""
         Field = self.SearchFieldCombo.currentIndex()
         self.Manager.Search(Text, Field)
-        self._RefreshPluginList()
-        self._SelectFirstOrClear()
+        self.RefreshPluginList()
+        self.SelectFirstOrClear()
 
-    def _OnSearchFieldChanged(self, Index: int):
+    def OnSearchFieldChanged(self, Index: int):
         """搜索字段变更"""
-        self._OnSearch(self.SearchEdit.text())
+        self.OnSearch(self.SearchEdit.text())
 
-    def _OnTabChanged(self, Index: int):
+    def OnTabChanged(self, Index: int):
         """标签页切换"""
-        self._RefreshPluginList()
-        self._SelectFirstOrClear()
+        self.RefreshPluginList()
+        self.SelectFirstOrClear()
 
-    def _OnPluginSelected(self):
+    def OnPluginSelected(self):
         """插件选中"""
         Items = self.PluginTree.selectedItems()
         if not Items:
             return
 
         PluginName = Items[0].data(0, Qt.UserRole)
-        Plugin = self.Manager.GetPluginByName(PluginName, self._CurSource)
+        Plugin = self.Manager.GetPluginByName(PluginName, self.CurSource)
         if not Plugin:
             return
 
-        self._ShowPluginDetail(Plugin)
+        self.ShowPluginDetail(Plugin)
 
-    def _ShowPluginDetail(self, Plugin: PluginInfo):
+    def ShowPluginDetail(self, Plugin: PluginInfo):
         """显示插件详情"""
         self.DetailPanel.setEnabled(True)
         self.NameLabel.setText(f"名称: {Plugin.Name}")
@@ -378,11 +378,11 @@ class MainWindow(QMainWindow):
         self.DescriptionEdit.setText(Plugin.Description or "无描述")
 
         # 依赖
-        Dependencies = self.Manager.GetDependencies(Plugin.Name, self._CurSource)
+        Dependencies = self.Manager.GetDependencies(Plugin.Name, self.CurSource)
         self.DependenciesEdit.setText(", ".join(Dependencies) if Dependencies else "无")
 
         # 被依赖
-        Dependents = self.Manager.GetDependents(Plugin.Name, self._CurSource)
+        Dependents = self.Manager.GetDependents(Plugin.Name, self.CurSource)
         self.DependentsEdit.setText(", ".join(Dependents) if Dependents else "无")
 
         # 启用状态
@@ -396,10 +396,10 @@ class MainWindow(QMainWindow):
         self.EnabledCheck.blockSignals(False)
 
         # 保存当前插件名
-        self._CurPluginName = Plugin.Name
-        self._CurPluginPath = Plugin.Path
+        self.CurPluginName = Plugin.Name
+        self.CurPluginPath = Plugin.Path
 
-    def _ClearDetailPanel(self):
+    def ClearDetailPanel(self):
         """清空并置灰详情面板"""
         self.DetailPanel.setEnabled(False)
         self.NameLabel.setText("名称: -")
@@ -413,24 +413,24 @@ class MainWindow(QMainWindow):
         self.EnabledCheck.blockSignals(True)
         self.EnabledCheck.setChecked(False)
         self.EnabledCheck.blockSignals(False)
-        if hasattr(self, "_CurPluginName"):
-            del self._CurPluginName
-        if hasattr(self, "_CurPluginPath"):
-            del self._CurPluginPath
+        if hasattr(self, "CurPluginName"):
+            del self.CurPluginName
+        if hasattr(self, "CurPluginPath"):
+            del self.CurPluginPath
 
-    def _OnEnabledChanged(self, State: int):
+    def OnEnabledChanged(self, State: int):
         """启用状态变更"""
-        if not hasattr(self, "_CurPluginName"):
+        if not hasattr(self, "CurPluginName"):
             return
 
         Enabled = Qt.CheckState(State) == Qt.CheckState.Checked
 
         if Enabled:
-            self._EnablePluginWithDeps(self._CurPluginName, self._CurSource)
+            self.EnablePluginWithDeps(self.CurPluginName, self.CurSource)
         else:
-            self._DisablePluginWithDeps(self._CurPluginName, self._CurSource)
+            self.DisablePluginWithDeps(self.CurPluginName, self.CurSource)
 
-    def _EnablePluginWithDeps(self, PluginName: str, Source):
+    def EnablePluginWithDeps(self, PluginName: str, Source):
         """启用插件及其依赖"""
         DisabledDeps = self.Manager.GetDisabledDependencies(PluginName, Source)
         PluginsToEnable = [(PluginName, Source)]
@@ -440,13 +440,16 @@ class MainWindow(QMainWindow):
             Msg = f"插件 {PluginName} 依赖以下未启用的插件：\n" + "\n".join(DepNames) + "\n\n是否一并启用？"
             Reply = QMessageBox.question(self, "依赖确认", Msg, QMessageBox.Yes | QMessageBox.Cancel)
             if Reply != QMessageBox.Yes:
-                self._RestoreCheckbox(PluginName, Source)
+                # 确保状态恢复（对话框可能导致状态丢失）
+                self.CurPluginName = PluginName
+                self.CurSource = Source
+                self.RestoreCheckbox(PluginName, Source)
                 return
             PluginsToEnable = DisabledDeps + PluginsToEnable
 
-        self._ApplyPluginChanges(PluginsToEnable, True)
+        self.ApplyPluginChanges(PluginsToEnable, True)
 
-    def _DisablePluginWithDeps(self, PluginName: str, Source):
+    def DisablePluginWithDeps(self, PluginName: str, Source):
         """禁用插件及依赖它的插件"""
         EnabledDependents = self.Manager.GetDisabledDependents(PluginName)
         PluginsToDisable = [(PluginName, Source)]
@@ -456,13 +459,16 @@ class MainWindow(QMainWindow):
             Msg = f"以下插件依赖 {PluginName}：\n" + "\n".join(DepNames) + "\n\n禁用后这些插件也将被禁用，是否继续？"
             Reply = QMessageBox.question(self, "依赖确认", Msg, QMessageBox.Yes | QMessageBox.Cancel)
             if Reply != QMessageBox.Yes:
-                self._RestoreCheckbox(PluginName, Source)
+                # 确保状态恢复（对话框可能导致状态丢失）
+                self.CurPluginName = PluginName
+                self.CurSource = Source
+                self.RestoreCheckbox(PluginName, Source)
                 return
             PluginsToDisable = EnabledDependents + PluginsToDisable
 
-        self._ApplyPluginChanges(PluginsToDisable, False)
+        self.ApplyPluginChanges(PluginsToDisable, False)
 
-    def _RestoreCheckbox(self, PluginName: str, Source):
+    def RestoreCheckbox(self, PluginName: str, Source):
         """恢复复选框状态"""
         Plugin = self.Manager.GetPluginByName(PluginName, Source)
         if Plugin:
@@ -475,7 +481,7 @@ class MainWindow(QMainWindow):
                 self.EnabledCheck.setChecked(Plugin.EnabledByDefault)
             self.EnabledCheck.blockSignals(False)
 
-    def _ApplyPluginChanges(self, Plugins: list, Enabled: bool):
+    def ApplyPluginChanges(self, Plugins: list, Enabled: bool):
         """批量应用插件状态变更"""
         Success = True
         for Name, Source in Plugins:
@@ -483,27 +489,27 @@ class MainWindow(QMainWindow):
                 Success = False
 
         if Success:
-            self._RefreshPluginList()
-            self._TryReselectOrFirst()
-            self._UpdateStatusBar()
+            self.RefreshPluginList()
+            self.TryReselectOrFirst()
+            self.UpdateStatusBar()
         else:
             QMessageBox.warning(self, "错误", "部分插件修改失败")
 
-    def _OnOpenFolder(self):
+    def OnOpenFolder(self):
         """打开插件目录"""
-        if not hasattr(self, "_CurPluginPath"):
+        if not hasattr(self, "CurPluginPath"):
             return
         import subprocess
-        subprocess.Popen(f'explorer "{self._CurPluginPath}"')
+        subprocess.Popen(f'explorer "{self.CurPluginPath}"')
 
-    def _OnOpenProjectFolder(self):
+    def OnOpenProjectFolder(self):
         """打开项目目录"""
         if not self.Manager.ProjectInfo:
             return
         import subprocess
         subprocess.Popen(f'explorer "{self.Manager.ProjectInfo.Path}"')
 
-    def _OnOpenEngineFolder(self):
+    def OnOpenEngineFolder(self):
         """打开引擎目录"""
         if not self.Manager.ProjectInfo or not self.Manager.ProjectInfo.EnginePath:
             QMessageBox.warning(self, "提示", "未找到引擎目录")
@@ -511,7 +517,7 @@ class MainWindow(QMainWindow):
         import subprocess
         subprocess.Popen(f'explorer "{self.Manager.ProjectInfo.EnginePath}"')
 
-    def _UpdateStatusBar(self):
+    def UpdateStatusBar(self):
         """更新状态栏"""
         Stats = self.Manager.GetStats()
         self.StatusLeftLabel.setText(
@@ -522,12 +528,12 @@ class MainWindow(QMainWindow):
             f"已启用: {Stats['Enabled']} | 已禁用: {Stats['Disabled']}"
         )
 
-    def _OnReload(self):
+    def OnReload(self):
         """重新加载插件"""
         if not self.Manager.ProjectInfo:
             return
-        PrevPluginName = getattr(self, "_CurPluginName", None)
-        self._LoadProject(self.Manager.ProjectInfo.Path, AutoSelect=False)
+        PrevPluginName = getattr(self, "CurPluginName", None)
+        self.LoadProject(self.Manager.ProjectInfo.Path, AutoSelect=False)
         if PrevPluginName:
-            self._CurPluginName = PrevPluginName
-        self._TryReselectOrFirst()
+            self.CurPluginName = PrevPluginName
+        self.TryReselectOrFirst()

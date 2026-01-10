@@ -85,25 +85,25 @@ class PluginReader:
             Name=UProjectFile.stem,
             Path=self.ProjectPath,
             EngineVersion=EngineAssociation,
-            EnginePath=self._FindEnginePath(EngineAssociation),
+            EnginePath=self.FindEnginePath(EngineAssociation),
             EnabledPlugins=EnabledPlugins,
             DisabledPlugins=DisabledPlugins
         )
         return self.ProjectInfo
 
-    def _FindEnginePath(self, EngineVersion: str) -> Optional[Path]:
+    def FindEnginePath(self, EngineVersion: str) -> Optional[Path]:
         """查找引擎路径"""
         if not EngineVersion:
             return None
 
         # 检查是否是 GUID（源码版本）
         if len(EngineVersion) == 32 or "-" in EngineVersion:
-            return self._FindEngineByGUID(EngineVersion)
+            return self.FindEngineByGUID(EngineVersion)
 
         # 标准版本号，查找安装路径
-        return self._FindEngineByVersion(EngineVersion)
+        return self.FindEngineByVersion(EngineVersion)
 
-    def _FindEngineByGUID(self, GUID: str) -> Optional[Path]:
+    def FindEngineByGUID(self, GUID: str) -> Optional[Path]:
         """通过 GUID 查找源码版引擎"""
         # Windows 注册表路径
         import winreg
@@ -118,7 +118,7 @@ class PluginReader:
         except:
             return None
 
-    def _FindEngineByVersion(self, Version: str) -> Optional[Path]:
+    def FindEngineByVersion(self, Version: str) -> Optional[Path]:
         """通过版本号查找安装版引擎"""
         import winreg
         try:
@@ -148,34 +148,34 @@ class PluginReader:
             return self.Plugins
 
         # 加载项目插件
-        self._LoadPluginsFromDir(
+        self.LoadPluginsFromDir(
             self.ProjectPath / "Plugins",
             PluginSource.Project
         )
 
         # 加载引擎插件
         if self.ProjectInfo.EnginePath:
-            self._LoadPluginsFromDir(
+            self.LoadPluginsFromDir(
                 self.ProjectInfo.EnginePath / "Engine" / "Plugins",
                 PluginSource.Engine
             )
 
         # 更新启用状态
-        self._UpdateEnabledStatus()
+        self.UpdateEnabledStatus()
 
         return self.Plugins
 
-    def _LoadPluginsFromDir(self, PluginsDir: Path, Source: PluginSource):
+    def LoadPluginsFromDir(self, PluginsDir: Path, Source: PluginSource):
         """从目录加载插件"""
         if not PluginsDir.exists():
             return
 
         for UPluginFile in PluginsDir.rglob("*.uplugin"):
-            Plugin = self._ParsePluginFile(UPluginFile, Source)
+            Plugin = self.ParsePluginFile(UPluginFile, Source)
             if Plugin:
                 self.Plugins[Plugin.Source].append(Plugin)
 
-    def _ParsePluginFile(self, UPluginFile: Path, Source: PluginSource) -> Optional[PluginInfo]:
+    def ParsePluginFile(self, UPluginFile: Path, Source: PluginSource) -> Optional[PluginInfo]:
         """解析插件文件"""
         try:
             with open(UPluginFile, "r", encoding="utf-8-sig") as F:
@@ -214,7 +214,7 @@ class PluginReader:
             print(f"解析插件失败: {UPluginFile} - {E}")
             return None
 
-    def _UpdateEnabledStatus(self):
+    def UpdateEnabledStatus(self):
         """更新插件在项目中的启用状态"""
         if not self.ProjectInfo:
             return
