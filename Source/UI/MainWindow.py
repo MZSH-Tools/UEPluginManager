@@ -479,13 +479,15 @@ class MainWindow(QMainWindow):
         self.CategoryLabel.setText(f"分类: {Plugin.Category or '-'}")
         self.DescriptionEdit.setText(Plugin.Description or "无描述")
 
-        # 依赖
-        Dependencies = self.Manager.GetDependencies(Plugin.Name, self.CurSource)
-        self.DependenciesEdit.setText(", ".join(Dependencies) if Dependencies else "无")
+        # 依赖（跨来源查找）
+        Dependencies = self.Manager.GetAllDependencies(Plugin.Name, self.CurSource)
+        DepNames = [Name for Name, _ in Dependencies]
+        self.DependenciesEdit.setText(", ".join(DepNames) if DepNames else "无")
 
-        # 被依赖
-        Dependents = self.Manager.GetDependents(Plugin.Name, self.CurSource)
-        self.DependentsEdit.setText(", ".join(Dependents) if Dependents else "无")
+        # 被依赖（跨来源查找）
+        Dependents = self.Manager.GetAllDependents(Plugin.Name)
+        DepByNames = [Name for Name, _ in Dependents]
+        self.DependentsEdit.setText(", ".join(DepByNames) if DepByNames else "无")
 
         # 检查冲突
         self.CurHasConflict = self.Manager.HasConflict(Plugin.Name)
@@ -784,14 +786,14 @@ class MainWindow(QMainWindow):
         if not hasattr(self, "CurPluginPath"):
             return
         import subprocess
-        subprocess.Popen(f'explorer "{self.CurPluginPath}"')
+        subprocess.Popen(['explorer', str(self.CurPluginPath)])
 
     def OnOpenProjectFolder(self):
         """打开项目目录"""
         if not self.Manager.ProjectInfo:
             return
         import subprocess
-        subprocess.Popen(f'explorer "{self.Manager.ProjectInfo.Path}"')
+        subprocess.Popen(['explorer', str(self.Manager.ProjectInfo.Path)])
 
     def OnOpenEngineFolder(self):
         """打开引擎目录"""
@@ -799,7 +801,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "提示", "未找到引擎目录")
             return
         import subprocess
-        subprocess.Popen(f'explorer "{self.Manager.ProjectInfo.EnginePath}"')
+        subprocess.Popen(['explorer', str(self.Manager.ProjectInfo.EnginePath)])
 
     def UpdateStatusBar(self):
         """更新状态栏"""
@@ -843,8 +845,8 @@ class MainWindow(QMainWindow):
         # 尝试关闭包含项目名的 UE 编辑器进程
         try:
             subprocess.run(
-                f'taskkill /FI "WINDOWTITLE eq {ProjectName}*" /IM UnrealEditor.exe',
-                shell=True, capture_output=True
+                ['taskkill', '/FI', f'WINDOWTITLE eq {ProjectName}*', '/IM', 'UnrealEditor.exe'],
+                capture_output=True
             )
         except Exception:
             pass

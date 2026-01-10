@@ -73,7 +73,8 @@ class PluginManager:
                     elif Field == 4:
                         Match = any(Keyword in Dep.lower() for Dep in P.Plugins)
                     elif Field == 5:
-                        Match = any(Keyword in Dep.lower() for Dep in self.GetDependents(P.Name, Source))
+                        Dependents = [Name for Name, _ in self.GetAllDependents(P.Name)]
+                        Match = any(Keyword in Dep.lower() for Dep in Dependents)
                     if Match:
                         self.FilteredPlugins[Source].append(P)
 
@@ -90,21 +91,27 @@ class PluginManager:
         if not self.ProjectInfo:
             return False
 
+        # 先更新项目文件，成功后再更新内存
+        if not self.UpdateProjectFile(PluginName, Enabled):
+            return False
+
         # 更新内存中的状态
         for Plugin in self.Plugins[Source]:
             if Plugin.Name == PluginName:
                 Plugin.EnabledInProject = Enabled
                 break
 
-        # 更新项目文件
-        return self.UpdateProjectFile(PluginName, Enabled)
+        return True
 
     def UpdateProjectFile(self, PluginName: str, Enabled: bool) -> bool:
         """更新项目文件中的插件状态"""
         if not self.ProjectInfo:
             return False
 
-        UProjectFile = list(self.ProjectInfo.Path.glob("*.uproject"))[0]
+        UProjectFiles = list(self.ProjectInfo.Path.glob("*.uproject"))
+        if not UProjectFiles:
+            return False
+        UProjectFile = UProjectFiles[0]
 
         try:
             with open(UProjectFile, "r", encoding="utf-8") as F:
@@ -149,7 +156,10 @@ class PluginManager:
         if not self.ProjectInfo:
             return False
 
-        UProjectFile = list(self.ProjectInfo.Path.glob("*.uproject"))[0]
+        UProjectFiles = list(self.ProjectInfo.Path.glob("*.uproject"))
+        if not UProjectFiles:
+            return False
+        UProjectFile = UProjectFiles[0]
 
         try:
             with open(UProjectFile, "r", encoding="utf-8") as F:
@@ -340,6 +350,8 @@ class PluginManager:
         if ToSource == PluginSource.Project:
             TargetDir = self.ProjectInfo.Path / "Plugins"
         elif ToSource == PluginSource.Fab:
+            if not self.ProjectInfo.EnginePath:
+                return False, "未找到引擎路径，无法移动到商城目录"
             TargetDir = self.ProjectInfo.EnginePath / "Engine" / "Plugins" / "Marketplace"
         else:
             return False, "不支持的目标位置"
@@ -371,7 +383,7 @@ class PluginManager:
             if NewPath.exists():
                 try:
                     shutil.rmtree(NewPath)
-                except:
+                except Exception:
                     pass
             return False, "拒绝访问，请确保 UE 编辑器已关闭。\n如果重试后仍失败，请手动执行。"
         except Exception as E:
@@ -379,7 +391,7 @@ class PluginManager:
             if NewPath.exists():
                 try:
                     shutil.rmtree(NewPath)
-                except:
+                except Exception:
                     pass
             return False, str(E)
 

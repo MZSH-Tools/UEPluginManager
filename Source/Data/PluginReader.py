@@ -65,8 +65,12 @@ class PluginReader:
             return None
 
         UProjectFile = UProjectFiles[0]
-        with open(UProjectFile, "r", encoding="utf-8-sig") as F:
-            Data = json.load(F)
+        try:
+            with open(UProjectFile, "r", encoding="utf-8-sig") as F:
+                Data = json.load(F)
+        except (json.JSONDecodeError, IOError) as E:
+            print(f"加载项目文件失败: {UProjectFile} - {E}")
+            return None
 
         # 解析引擎版本
         EngineAssociation = Data.get("EngineAssociation", "")
@@ -115,7 +119,7 @@ class PluginReader:
             EnginePath, _ = winreg.QueryValueEx(Key, GUID)
             winreg.CloseKey(Key)
             return Path(EnginePath)
-        except:
+        except (OSError, FileNotFoundError):
             return None
 
     def FindEngineByVersion(self, Version: str) -> Optional[Path]:
@@ -129,7 +133,7 @@ class PluginReader:
             InstallDir, _ = winreg.QueryValueEx(Key, "InstalledDirectory")
             winreg.CloseKey(Key)
             return Path(InstallDir)
-        except:
+        except (OSError, FileNotFoundError):
             # 尝试默认路径
             DefaultPath = Path(f"C:/Program Files/Epic Games/UE_{Version}")
             if DefaultPath.exists():

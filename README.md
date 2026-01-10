@@ -25,21 +25,9 @@ UE 插件管理工具，统一管理 UE 项目及其关联引擎中的所有插�
 - **关闭项目** - 尝试关闭 UE 编辑器
 - **重新加载** - 外部修改后刷新插件列表
 
-## 运行
-
-```bash
-# 创建环境
-conda create -n UEPluginManager python=3.11 -y
-conda activate UEPluginManager
-pip install -r requirements.txt
-
-# 启动（在 UE 项目目录下）
-python Main.py
-```
-
 ## 使用
 
-1. 在 UE 项目目录下启动工具
+1. 下载 Release 中的 `UEPluginManager.exe`，放入 UE 项目目录下运行
 2. 工具自动扫描项目和引擎插件
 3. 使用搜索框和标签页定位插件
 4. 点击插件查看详情和依赖关系
