@@ -1,8 +1,20 @@
 # 插件管理业务逻辑
 import json
+import os
+import stat
 from pathlib import Path
 from typing import Optional
 from Source.Data.PluginReader import PluginReader, PluginInfo, ProjectInfo, PluginSource
+
+
+def RemoveReadOnly(Path: Path):
+    """递归移除目录及其内容的只读属性"""
+    if Path.is_file():
+        os.chmod(Path, stat.S_IWRITE)
+    elif Path.is_dir():
+        for Item in Path.rglob("*"):
+            if Item.is_file():
+                os.chmod(Item, stat.S_IWRITE)
 
 
 class PluginManager:
@@ -260,41 +272,42 @@ class PluginManager:
                     break
         return len(FoundSources) > 1
 
-    def RenamePluginFolder(self, Name: str, Source: PluginSource) -> bool:
-        """重命名插件文件夹为插件同名"""
+    def RenamePluginFolder(self, Name: str, Source: PluginSource) -> tuple[bool, str]:
+        """重命名插件文件夹为插件同名，返回 (成功, 错误信息)"""
         Plugin = self.GetPluginByName(Name, Source)
         if not Plugin:
-            return False
+            return False, "插件不存在"
 
         OldPath = Plugin.Path
         NewPath = OldPath.parent / Name
 
         # 已经是正确名称
         if OldPath.name == Name:
-            return True
+            return True, ""
 
         # 目标路径已存在
         if NewPath.exists():
-            print(f"目标路径已存在: {NewPath}")
-            return False
+            return False, f"目标路径已存在: {NewPath}"
 
         try:
+            RemoveReadOnly(OldPath)
             OldPath.rename(NewPath)
-            # 更新内存中的路径
             Plugin.Path = NewPath
-            return True
+            return True, ""
+        except PermissionError:
+            return False, "拒绝访问，请确保 UE 编辑器已关闭。\n如果重试后仍失败，请手动执行。"
         except Exception as E:
-            print(f"重命名插件文件夹失败: {E}")
-            return False
+            return False, str(E)
 
-    def DeletePlugin(self, Name: str, Source: PluginSource) -> bool:
-        """删除插件（移动到回收站）"""
+    def DeletePlugin(self, Name: str, Source: PluginSource) -> tuple[bool, str]:
+        """删除插件（移动到回收站），返回 (成功, 错误信息)"""
         import shutil
         Plugin = self.GetPluginByName(Name, Source)
         if not Plugin:
-            return False
+            return False, "插件不存在"
 
         try:
+            RemoveReadOnly(Plugin.Path)
             # 使用 send2trash 移动到回收站（如果可用）
             try:
                 from send2trash import send2trash
@@ -310,10 +323,65 @@ class PluginManager:
             # 从项目文件移除配置
             self.ResetPluginToDefault(Name, Source)
 
-            return True
+            return True, ""
+        except PermissionError:
+            return False, "拒绝访问，请确保 UE 编辑器已关闭。\n如果重试后仍失败，请手动执行。"
         except Exception as E:
-            print(f"删除插件失败: {E}")
-            return False
+            return False, str(E)
+
+    def MovePlugin(self, Name: str, FromSource: PluginSource, ToSource: PluginSource) -> tuple[bool, str]:
+        """移动插件到另一个来源目录，返回 (成功, 错误信息)"""
+        import shutil
+        Plugin = self.GetPluginByName(Name, FromSource)
+        if not Plugin:
+            return False, "插件不存在"
+
+        # 确定目标目录
+        if ToSource == PluginSource.Project:
+            TargetDir = self.ProjectInfo.Path / "Plugins"
+        elif ToSource == PluginSource.Fab:
+            TargetDir = self.ProjectInfo.EnginePath / "Engine" / "Plugins" / "Marketplace"
+        else:
+            return False, "不支持的目标位置"
+
+        # 确保目标目录存在
+        TargetDir.mkdir(parents=True, exist_ok=True)
+        NewPath = TargetDir / Plugin.Path.name
+
+        # 目标已存在
+        if NewPath.exists():
+            return False, f"目标路径已存在: {NewPath}"
+
+        try:
+            RemoveReadOnly(Plugin.Path)
+            shutil.move(str(Plugin.Path), str(NewPath))
+
+            # 更新内存中的数据
+            self.Plugins[FromSource] = [P for P in self.Plugins[FromSource] if P.Name != Name]
+            self.FilteredPlugins[FromSource] = [P for P in self.FilteredPlugins[FromSource] if P.Name != Name]
+
+            Plugin.Path = NewPath
+            Plugin.Source = ToSource
+            self.Plugins[ToSource].append(Plugin)
+            self.FilteredPlugins[ToSource].append(Plugin)
+
+            return True, ""
+        except PermissionError:
+            # 跨盘符移动时可能已复制部分文件，需要清理
+            if NewPath.exists():
+                try:
+                    shutil.rmtree(NewPath)
+                except:
+                    pass
+            return False, "拒绝访问，请确保 UE 编辑器已关闭。\n如果重试后仍失败，请手动执行。"
+        except Exception as E:
+            # 清理可能已复制的文件
+            if NewPath.exists():
+                try:
+                    shutil.rmtree(NewPath)
+                except:
+                    pass
+            return False, str(E)
 
     def GetStats(self) -> dict:
         """获取统计信息"""

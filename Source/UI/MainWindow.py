@@ -164,13 +164,16 @@ class MainWindow(QMainWindow):
         Layout.addWidget(self.SourceTabs)
 
         self.PluginTree = QTreeWidget()
-        self.PluginTree.setHeaderLabels(["名称", "作者", "分类", "状态"])
+        self.PluginTreeHeaders = ["名称", "作者", "分类", "状态"]
+        self.PluginTree.setHeaderLabels(self.PluginTreeHeaders)
         self.PluginTree.setRootIsDecorated(False)
         self.PluginTree.setSortingEnabled(True)
         self.PluginTree.sortByColumn(0, Qt.AscendingOrder)
         self.PluginTree.itemSelectionChanged.connect(self.OnPluginSelected)
 
         Header = self.PluginTree.header()
+        Header.setSortIndicatorShown(False)
+        Header.sortIndicatorChanged.connect(self.OnSortChanged)
         Header.setSectionsMovable(False)
         Header.setStretchLastSection(False)
         Header.setSectionResizeMode(0, QHeaderView.Stretch)
@@ -179,6 +182,9 @@ class MainWindow(QMainWindow):
         Header.setSectionResizeMode(3, QHeaderView.Fixed)
         Header.resizeSection(1, 120)
         Header.resizeSection(3, 80)
+
+        # 初始化排序箭头
+        self.OnSortChanged(0, Qt.AscendingOrder)
 
         Layout.addWidget(self.PluginTree)
 
@@ -285,6 +291,18 @@ class MainWindow(QMainWindow):
         FixRow.addWidget(FixTip)
         FixRow.addStretch()
         BtnLayout.addLayout(FixRow)
+
+        # 移动插件
+        MoveRow = QHBoxLayout()
+        self.MovePluginBtn = QPushButton("移至商城")
+        self.MovePluginBtn.setFixedWidth(80)
+        self.MovePluginBtn.clicked.connect(self.OnMovePlugin)
+        MoveRow.addWidget(self.MovePluginBtn)
+        self.MoveTip = QLabel("将插件移动到商城目录")
+        self.MoveTip.setStyleSheet("color: gray;")
+        MoveRow.addWidget(self.MoveTip)
+        MoveRow.addStretch()
+        BtnLayout.addLayout(MoveRow)
 
         # 删除插件
         DeleteRow = QHBoxLayout()
@@ -426,6 +444,15 @@ class MainWindow(QMainWindow):
         self.RefreshPluginList()
         self.SelectFirstOrClear()
 
+    def OnSortChanged(self, Column: int, Order):
+        """排序变更，更新列标题箭头"""
+        for i, Name in enumerate(self.PluginTreeHeaders):
+            if i == Column:
+                Arrow = " ↑" if Order == Qt.AscendingOrder else " ↓"
+                self.PluginTree.headerItem().setText(i, Name + Arrow)
+            else:
+                self.PluginTree.headerItem().setText(i, Name)
+
     def OnPluginSelected(self):
         """插件选中"""
         Items = self.PluginTree.selectedItems()
@@ -484,6 +511,21 @@ class MainWindow(QMainWindow):
         # 路径修正（文件夹名与插件名不一致且非引擎插件时可用）
         CanFix = Plugin.Path.name != Plugin.Name and self.CurSource != PluginSource.Engine
         self.FixFolderBtn.setEnabled(CanFix)
+
+        # 移动按钮（引擎插件不可用）
+        if self.CurSource == PluginSource.Project:
+            self.MovePluginBtn.setText("移至商城")
+            self.MoveTip.setText("将插件移动到商城目录")
+            CanMove = True
+        elif self.CurSource == PluginSource.Fab:
+            self.MovePluginBtn.setText("移至项目")
+            self.MoveTip.setText("将插件移动到项目目录")
+            CanMove = True
+        else:
+            self.MovePluginBtn.setText("移动插件")
+            self.MoveTip.setText("引擎插件不可移动")
+            CanMove = False
+        self.MovePluginBtn.setEnabled(CanMove)
 
     def ClearDetailPanel(self):
         """清空并置灰详情面板"""
@@ -628,6 +670,51 @@ class MainWindow(QMainWindow):
             self.TryReselectOrFirst()
             self.UpdateStatusBar()
 
+    def OnMovePlugin(self):
+        """移动插件"""
+        if not hasattr(self, "CurPluginName"):
+            return
+
+        # 引擎插件不可移动
+        if self.CurSource == PluginSource.Engine:
+            return
+
+        # 冲突插件需要先解决冲突
+        if getattr(self, "CurHasConflict", False):
+            QMessageBox.warning(self, "无法移动", "存在同名插件冲突，请先删除其中一个后再移动。")
+            return
+
+        Plugin = self.Manager.GetPluginByName(self.CurPluginName, self.CurSource)
+        if not Plugin:
+            return
+
+        # 确定目标来源
+        if self.CurSource == PluginSource.Project:
+            TargetSource = PluginSource.Fab
+            TargetName = "商城"
+        else:
+            TargetSource = PluginSource.Project
+            TargetName = "项目"
+
+        Reply = QMessageBox.question(
+            self, "确认移动",
+            f"将插件 {self.CurPluginName} 移动到{TargetName}目录？\n\n"
+            f"源目录: {Plugin.Path}",
+            QMessageBox.Yes | QMessageBox.Cancel
+        )
+
+        if Reply != QMessageBox.Yes:
+            return
+
+        Success, Error = self.Manager.MovePlugin(self.CurPluginName, self.CurSource, TargetSource)
+        if Success:
+            self.RefreshPluginList()
+            self.SelectFirstOrClear()
+            self.UpdateStatusBar()
+            QMessageBox.information(self, "成功", f"插件已移动到{TargetName}目录")
+        else:
+            QMessageBox.warning(self, "移动失败", Error)
+
     def OnDeletePlugin(self):
         """删除插件"""
         if not hasattr(self, "CurPluginName"):
@@ -653,12 +740,13 @@ class MainWindow(QMainWindow):
         if Reply != QMessageBox.Yes:
             return
 
-        if self.Manager.DeletePlugin(self.CurPluginName, self.CurSource):
+        Success, Error = self.Manager.DeletePlugin(self.CurPluginName, self.CurSource)
+        if Success:
             self.RefreshPluginList()
             self.SelectFirstOrClear()
             self.UpdateStatusBar()
         else:
-            QMessageBox.warning(self, "错误", "删除插件失败")
+            QMessageBox.warning(self, "删除失败", Error)
 
     def OnFixFolder(self):
         """修正文件夹名称"""
@@ -681,14 +769,15 @@ class MainWindow(QMainWindow):
         if Reply != QMessageBox.Yes:
             return
 
-        if self.Manager.RenamePluginFolder(self.CurPluginName, self.CurSource):
+        Success, Error = self.Manager.RenamePluginFolder(self.CurPluginName, self.CurSource)
+        if Success:
             # 更新目录显示
             self.FolderLabel.setText(f"目录: {Plugin.Path.name}")
             self.CurPluginPath = Plugin.Path
             self.FixFolderBtn.setEnabled(False)
             QMessageBox.information(self, "成功", "目录已修正")
         else:
-            QMessageBox.warning(self, "错误", "修正目录失败")
+            QMessageBox.warning(self, "修正失败", Error)
 
     def OnOpenFolder(self):
         """打开插件目录"""
