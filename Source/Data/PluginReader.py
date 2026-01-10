@@ -25,7 +25,7 @@ class PluginInfo:
     Category: str = ""
     CreatedBy: str = ""
     DocsURL: str = ""
-    EnabledByDefault: bool = True
+    EnabledByDefault: bool = False
     CanContainContent: bool = False
     IsBetaVersion: bool = False
     Modules: list = field(default_factory=list)
@@ -204,7 +204,7 @@ class PluginReader:
                 Category=Data.get("Category", ""),
                 CreatedBy=Data.get("CreatedBy", ""),
                 DocsURL=Data.get("DocsURL", ""),
-                EnabledByDefault=Data.get("EnabledByDefault", True),
+                EnabledByDefault=Data.get("EnabledByDefault", False),
                 CanContainContent=Data.get("CanContainContent", False),
                 IsBetaVersion=Data.get("IsBetaVersion", False),
                 Modules=Data.get("Modules", []),

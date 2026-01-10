@@ -132,6 +132,41 @@ class PluginManager:
             print(f"更新项目文件失败: {E}")
             return False
 
+    def ResetPluginToDefault(self, PluginName: str, Source: PluginSource) -> bool:
+        """恢复插件到默认状态（从项目文件中移除配置）"""
+        if not self.ProjectInfo:
+            return False
+
+        UProjectFile = list(self.ProjectInfo.Path.glob("*.uproject"))[0]
+
+        try:
+            with open(UProjectFile, "r", encoding="utf-8") as F:
+                Data = json.load(F)
+
+            Plugins = Data.get("Plugins", [])
+
+            # 移除插件配置
+            Data["Plugins"] = [P for P in Plugins if P.get("Name") != PluginName]
+
+            with open(UProjectFile, "w", encoding="utf-8") as F:
+                json.dump(Data, F, indent="\t", ensure_ascii=False)
+
+            # 更新内存中的状态
+            if PluginName in self.ProjectInfo.EnabledPlugins:
+                self.ProjectInfo.EnabledPlugins.remove(PluginName)
+            if PluginName in self.ProjectInfo.DisabledPlugins:
+                self.ProjectInfo.DisabledPlugins.remove(PluginName)
+
+            for Plugin in self.Plugins[Source]:
+                if Plugin.Name == PluginName:
+                    Plugin.EnabledInProject = None
+                    break
+
+            return True
+        except Exception as E:
+            print(f"恢复默认状态失败: {E}")
+            return False
+
     def GetDependencies(self, PluginName: str, Source: PluginSource) -> list[str]:
         """获取插件依赖"""
         for Plugin in self.Plugins[Source]:

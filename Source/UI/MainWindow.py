@@ -223,6 +223,10 @@ class MainWindow(QMainWindow):
         self.EnabledCheck.clicked.connect(self.OnEnabledClicked)
         ControlLayout.addWidget(self.EnabledCheck)
 
+        self.ResetDefaultBtn = QPushButton("恢复默认")
+        self.ResetDefaultBtn.clicked.connect(self.OnResetDefault)
+        ControlLayout.addWidget(self.ResetDefaultBtn)
+
         self.OpenFolderBtn = QPushButton("打开目录")
         self.OpenFolderBtn.clicked.connect(self.OnOpenFolder)
         ControlLayout.addWidget(self.OpenFolderBtn)
@@ -485,6 +489,24 @@ class MainWindow(QMainWindow):
             self.UpdateStatusBar()
         else:
             QMessageBox.warning(self, "错误", "部分插件修改失败")
+
+    def OnResetDefault(self):
+        """恢复插件默认状态"""
+        if not hasattr(self, "CurPluginName"):
+            return
+
+        Plugin = self.Manager.GetPluginByName(self.CurPluginName, self.CurSource)
+        if not Plugin:
+            return
+
+        # 已经是默认状态
+        if Plugin.EnabledInProject is None:
+            return
+
+        if self.Manager.ResetPluginToDefault(self.CurPluginName, self.CurSource):
+            self.RefreshPluginList()
+            self.TryReselectOrFirst()
+            self.UpdateStatusBar()
 
     def OnOpenFolder(self):
         """打开插件目录"""
