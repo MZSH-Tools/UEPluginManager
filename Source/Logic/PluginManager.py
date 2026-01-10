@@ -240,6 +240,54 @@ class PluginManager:
                 return Plugin
         return None
 
+    def GetConflictingPlugin(self, Name: str, Source: PluginSource) -> Optional[tuple[PluginInfo, PluginSource]]:
+        """获取同名冲突插件（返回另一个来源的同名插件）"""
+        for S in PluginSource:
+            if S == Source:
+                continue
+            for Plugin in self.Plugins[S]:
+                if Plugin.Name == Name:
+                    return (Plugin, S)
+        return None
+
+    def HasConflict(self, Name: str) -> bool:
+        """检查插件是否存在同名冲突"""
+        FoundSources = []
+        for S in PluginSource:
+            for Plugin in self.Plugins[S]:
+                if Plugin.Name == Name:
+                    FoundSources.append(S)
+                    break
+        return len(FoundSources) > 1
+
+    def DeletePlugin(self, Name: str, Source: PluginSource) -> bool:
+        """删除插件（移动到回收站）"""
+        import shutil
+        Plugin = self.GetPluginByName(Name, Source)
+        if not Plugin:
+            return False
+
+        try:
+            # 使用 send2trash 移动到回收站（如果可用）
+            try:
+                from send2trash import send2trash
+                send2trash(str(Plugin.Path))
+            except ImportError:
+                # 没有 send2trash，直接删除
+                shutil.rmtree(Plugin.Path)
+
+            # 从内存中移除
+            self.Plugins[Source] = [P for P in self.Plugins[Source] if P.Name != Name]
+            self.FilteredPlugins[Source] = [P for P in self.FilteredPlugins[Source] if P.Name != Name]
+
+            # 从项目文件移除配置
+            self.ResetPluginToDefault(Name, Source)
+
+            return True
+        except Exception as E:
+            print(f"删除插件失败: {E}")
+            return False
+
     def GetStats(self) -> dict:
         """获取统计信息"""
         Total = sum(len(self.Plugins[S]) for S in PluginSource)

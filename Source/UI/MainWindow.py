@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (
     QGroupBox, QCheckBox, QPushButton, QMessageBox, QHeaderView, QStatusBar, QTabBar, QComboBox
 )
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QFont
+from PySide6.QtGui import QFont, QColor, QBrush
 
 from Source.Logic.PluginManager import PluginManager
 from Source.Data.PluginReader import PluginInfo, PluginSource
@@ -236,6 +236,20 @@ class MainWindow(QMainWindow):
 
         Layout.addStretch()
 
+        # 删除按钮（底部居中）
+        DeleteLayout = QHBoxLayout()
+        DeleteLayout.addStretch()
+        self.DeletePluginBtn = QPushButton("删除插件")
+        self.DeletePluginBtn.setFixedSize(120, 36)
+        self.DeletePluginBtn.setStyleSheet("""
+            QPushButton { color: red; font-size: 14px; }
+            QPushButton:disabled { color: gray; background-color: #f0f0f0; }
+        """)
+        self.DeletePluginBtn.clicked.connect(self.OnDeletePlugin)
+        DeleteLayout.addWidget(self.DeletePluginBtn)
+        DeleteLayout.addStretch()
+        Layout.addLayout(DeleteLayout)
+
         return self.DetailPanel
 
     def LoadProject(self, ProjectPath: Path, AutoSelect: bool = True):
@@ -295,6 +309,7 @@ class MainWindow(QMainWindow):
         self.SourceTabs.setTabText(2, f"引擎 ({EngineCount})")
 
         # 只显示当前标签页类型的插件
+        RedBrush = QBrush(QColor(220, 50, 50))
         Plugins = self.Manager.GetPlugins(self.CurSource)
         for Plugin in Plugins:
             Item = QTreeWidgetItem()
@@ -302,8 +317,14 @@ class MainWindow(QMainWindow):
             Item.setText(1, Plugin.CreatedBy or "-")
             Item.setText(2, Plugin.Category or "-")
 
+            # 检查是否冲突
+            HasConflict = self.Manager.HasConflict(Plugin.Name)
+
             # 状态
-            if Plugin.EnabledInProject is True:
+            if HasConflict:
+                Status = "冲突"
+                Item.setForeground(3, RedBrush)
+            elif Plugin.EnabledInProject is True:
                 Status = "启用"
             elif Plugin.EnabledInProject is False:
                 Status = "禁用"
@@ -388,8 +409,14 @@ class MainWindow(QMainWindow):
         Dependents = self.Manager.GetDependents(Plugin.Name, self.CurSource)
         self.DependentsEdit.setText(", ".join(Dependents) if Dependents else "无")
 
+        # 检查冲突
+        self.CurHasConflict = self.Manager.HasConflict(Plugin.Name)
+
         # 启用状态（clicked 信号只响应用户点击，程序修改不会触发）
-        if Plugin.EnabledInProject is True:
+        if self.CurHasConflict:
+            # 冲突时不勾选
+            self.EnabledCheck.setChecked(False)
+        elif Plugin.EnabledInProject is True:
             self.EnabledCheck.setChecked(True)
         elif Plugin.EnabledInProject is False:
             self.EnabledCheck.setChecked(False)
@@ -399,6 +426,9 @@ class MainWindow(QMainWindow):
         # 保存当前插件名
         self.CurPluginName = Plugin.Name
         self.CurPluginPath = Plugin.Path
+
+        # 引擎插件不可删除
+        self.DeletePluginBtn.setEnabled(self.CurSource != PluginSource.Engine)
 
     def ClearDetailPanel(self):
         """清空并置灰详情面板"""
@@ -416,16 +446,51 @@ class MainWindow(QMainWindow):
             del self.CurPluginName
         if hasattr(self, "CurPluginPath"):
             del self.CurPluginPath
+        self.CurHasConflict = False
 
     def OnEnabledClicked(self, Checked: bool):
         """用户点击启用复选框"""
         if not hasattr(self, "CurPluginName"):
             return
 
+        # 冲突时弹出二选一对话框
+        if getattr(self, "CurHasConflict", False) and Checked:
+            self.HandleConflictEnable()
+            return
+
         if Checked:
             self.EnablePluginWithDeps(self.CurPluginName, self.CurSource)
         else:
             self.DisablePluginWithDeps(self.CurPluginName, self.CurSource)
+
+    def HandleConflictEnable(self):
+        """处理冲突插件启用（提示用户）"""
+        PluginName = self.CurPluginName
+        CurPlugin = self.Manager.GetPluginByName(PluginName, self.CurSource)
+        Conflict = self.Manager.GetConflictingPlugin(PluginName, self.CurSource)
+
+        if not CurPlugin or not Conflict:
+            self.EnabledCheck.setChecked(False)
+            return
+
+        ConflictPlugin, ConflictSource = Conflict
+
+        SourceNames = {
+            PluginSource.Project: "项目",
+            PluginSource.Engine: "引擎",
+            PluginSource.Fab: "商城"
+        }
+
+        CurSourceName = SourceNames[self.CurSource]
+        ConflictSourceName = SourceNames[ConflictSource]
+
+        QMessageBox.warning(
+            self, "同名插件冲突",
+            f"插件 {PluginName} 在 {CurSourceName} 和 {ConflictSourceName} 中都存在。\n\n"
+            f"UE 不支持同名插件，请手动删除其中一个后再启用。"
+        )
+
+        self.EnabledCheck.setChecked(False)
 
     def EnablePluginWithDeps(self, PluginName: str, Source):
         """启用插件及其依赖"""
@@ -507,6 +572,38 @@ class MainWindow(QMainWindow):
             self.RefreshPluginList()
             self.TryReselectOrFirst()
             self.UpdateStatusBar()
+
+    def OnDeletePlugin(self):
+        """删除插件"""
+        if not hasattr(self, "CurPluginName"):
+            return
+
+        # 引擎插件不可删除
+        if self.CurSource == PluginSource.Engine:
+            return
+
+        Plugin = self.Manager.GetPluginByName(self.CurPluginName, self.CurSource)
+        if not Plugin:
+            return
+
+        SourceNames = {PluginSource.Project: "项目", PluginSource.Fab: "商城"}
+        SourceName = SourceNames.get(self.CurSource, "")
+
+        Reply = QMessageBox.warning(
+            self, "确认删除",
+            f"确定要删除{SourceName}插件 {self.CurPluginName} 吗？\n\n路径: {Plugin.Path}\n\n此操作会将插件移至回收站。",
+            QMessageBox.Yes | QMessageBox.Cancel
+        )
+
+        if Reply != QMessageBox.Yes:
+            return
+
+        if self.Manager.DeletePlugin(self.CurPluginName, self.CurSource):
+            self.RefreshPluginList()
+            self.SelectFirstOrClear()
+            self.UpdateStatusBar()
+        else:
+            QMessageBox.warning(self, "错误", "删除插件失败")
 
     def OnOpenFolder(self):
         """打开插件目录"""
