@@ -105,16 +105,34 @@ class MainWindow(QMainWindow):
     def CreateButtonRow(self, ParentLayout: QVBoxLayout):
         """创建按钮行"""
         Container = QWidget()
-        Container.setFixedHeight(52)
         Layout = QVBoxLayout(Container)
         Layout.setContentsMargins(0, 0, 0, 0)
-        Row = QHBoxLayout()
-        Row.addStretch()
+        Layout.setSpacing(8)
+
+        # 关闭项目
+        CloseRow = QHBoxLayout()
+        self.CloseProjectBtn = QPushButton("关闭项目")
+        self.CloseProjectBtn.setFixedWidth(80)
+        self.CloseProjectBtn.clicked.connect(self.OnCloseProject)
+        CloseRow.addWidget(self.CloseProjectBtn)
+        CloseTip = QLabel("建议在项目关闭时进行修改，以避免未知错误")
+        CloseTip.setStyleSheet("color: gray;")
+        CloseRow.addWidget(CloseTip)
+        CloseRow.addStretch()
+        Layout.addLayout(CloseRow)
+
+        # 重新加载
+        ReloadRow = QHBoxLayout()
         self.ReloadBtn = QPushButton("重新加载")
+        self.ReloadBtn.setFixedWidth(80)
         self.ReloadBtn.clicked.connect(self.OnReload)
-        Row.addWidget(self.ReloadBtn)
-        Layout.addLayout(Row)
-        Layout.addStretch()
+        ReloadRow.addWidget(self.ReloadBtn)
+        ReloadTip = QLabel("在外部修改插件后点击刷新界面")
+        ReloadTip.setStyleSheet("color: gray;")
+        ReloadRow.addWidget(ReloadTip)
+        ReloadRow.addStretch()
+        Layout.addLayout(ReloadRow)
+
         ParentLayout.addWidget(Container)
 
     def CreatePluginList(self) -> QWidget:
@@ -179,9 +197,8 @@ class MainWindow(QMainWindow):
         self.NameLabel.setFont(QFont("Microsoft YaHei", 12, QFont.Bold))
         InfoLayout.addWidget(self.NameLabel)
 
-        self.PathLabel = QLabel("路径: -")
-        self.PathLabel.setWordWrap(True)
-        InfoLayout.addWidget(self.PathLabel)
+        self.FolderLabel = QLabel("目录: -")
+        InfoLayout.addWidget(self.FolderLabel)
 
         self.DocsLabel = QLabel("文档: -")
         self.DocsLabel.setOpenExternalLinks(True)
@@ -217,38 +234,72 @@ class MainWindow(QMainWindow):
         self.DependentsEdit.setMaximumHeight(60)
         Layout.addWidget(self.DependentsEdit)
 
-        # 启用控制
-        ControlLayout = QHBoxLayout()
-        self.EnabledCheck = QCheckBox("在项目中启用")
+        # 按钮区
+        BtnLayout = QVBoxLayout()
+        BtnLayout.setSpacing(8)
+
+        # 启用复选框
+        EnableRow = QHBoxLayout()
+        self.EnabledCheck = QCheckBox("启用插件")
+        self.EnabledCheck.setFixedWidth(80)
         self.EnabledCheck.clicked.connect(self.OnEnabledClicked)
-        ControlLayout.addWidget(self.EnabledCheck)
+        EnableRow.addWidget(self.EnabledCheck)
+        EnableTip = QLabel("在项目中启用或禁用此插件")
+        EnableTip.setStyleSheet("color: gray;")
+        EnableRow.addWidget(EnableTip)
+        EnableRow.addStretch()
+        BtnLayout.addLayout(EnableRow)
 
+        # 恢复默认
+        ResetRow = QHBoxLayout()
         self.ResetDefaultBtn = QPushButton("恢复默认")
+        self.ResetDefaultBtn.setFixedWidth(80)
         self.ResetDefaultBtn.clicked.connect(self.OnResetDefault)
-        ControlLayout.addWidget(self.ResetDefaultBtn)
+        ResetRow.addWidget(self.ResetDefaultBtn)
+        ResetTip = QLabel("移除项目配置，使用插件默认状态")
+        ResetTip.setStyleSheet("color: gray;")
+        ResetRow.addWidget(ResetTip)
+        ResetRow.addStretch()
+        BtnLayout.addLayout(ResetRow)
 
+        # 打开目录
+        OpenRow = QHBoxLayout()
         self.OpenFolderBtn = QPushButton("打开目录")
+        self.OpenFolderBtn.setFixedWidth(80)
         self.OpenFolderBtn.clicked.connect(self.OnOpenFolder)
-        ControlLayout.addWidget(self.OpenFolderBtn)
+        OpenRow.addWidget(self.OpenFolderBtn)
+        OpenTip = QLabel("在资源管理器中打开插件目录")
+        OpenTip.setStyleSheet("color: gray;")
+        OpenRow.addWidget(OpenTip)
+        OpenRow.addStretch()
+        BtnLayout.addLayout(OpenRow)
 
-        ControlLayout.addStretch()
-        Layout.addLayout(ControlLayout)
+        # 目录修正
+        FixRow = QHBoxLayout()
+        self.FixFolderBtn = QPushButton("目录修正")
+        self.FixFolderBtn.setFixedWidth(80)
+        self.FixFolderBtn.clicked.connect(self.OnFixFolder)
+        FixRow.addWidget(self.FixFolderBtn)
+        FixTip = QLabel("将目录重命名为插件同名")
+        FixTip.setStyleSheet("color: gray;")
+        FixRow.addWidget(FixTip)
+        FixRow.addStretch()
+        BtnLayout.addLayout(FixRow)
 
-        Layout.addStretch()
-
-        # 删除按钮（底部居中）
-        DeleteLayout = QHBoxLayout()
-        DeleteLayout.addStretch()
+        # 删除插件
+        DeleteRow = QHBoxLayout()
         self.DeletePluginBtn = QPushButton("删除插件")
-        self.DeletePluginBtn.setFixedSize(120, 36)
-        self.DeletePluginBtn.setStyleSheet("""
-            QPushButton { color: red; font-size: 14px; }
-            QPushButton:disabled { color: gray; background-color: #f0f0f0; }
-        """)
+        self.DeletePluginBtn.setFixedWidth(80)
         self.DeletePluginBtn.clicked.connect(self.OnDeletePlugin)
-        DeleteLayout.addWidget(self.DeletePluginBtn)
-        DeleteLayout.addStretch()
-        Layout.addLayout(DeleteLayout)
+        DeleteRow.addWidget(self.DeletePluginBtn)
+        DeleteTip = QLabel("将插件移至回收站")
+        DeleteTip.setStyleSheet("color: gray;")
+        DeleteRow.addWidget(DeleteTip)
+        DeleteRow.addStretch()
+        BtnLayout.addLayout(DeleteRow)
+
+        Layout.addLayout(BtnLayout)
+        Layout.addStretch()
 
         return self.DetailPanel
 
@@ -392,7 +443,7 @@ class MainWindow(QMainWindow):
         """显示插件详情"""
         self.DetailPanel.setEnabled(True)
         self.NameLabel.setText(f"名称: {Plugin.Name}")
-        self.PathLabel.setText(f"路径: {Plugin.Path}")
+        self.FolderLabel.setText(f"目录: {Plugin.Path.name}")
         if Plugin.DocsURL:
             self.DocsLabel.setText(f'文档: <a href="{Plugin.DocsURL}">{Plugin.DocsURL}</a>')
         else:
@@ -430,11 +481,15 @@ class MainWindow(QMainWindow):
         # 引擎插件不可删除
         self.DeletePluginBtn.setEnabled(self.CurSource != PluginSource.Engine)
 
+        # 路径修正（文件夹名与插件名不一致且非引擎插件时可用）
+        CanFix = Plugin.Path.name != Plugin.Name and self.CurSource != PluginSource.Engine
+        self.FixFolderBtn.setEnabled(CanFix)
+
     def ClearDetailPanel(self):
         """清空并置灰详情面板"""
         self.DetailPanel.setEnabled(False)
         self.NameLabel.setText("名称: -")
-        self.PathLabel.setText("路径: -")
+        self.FolderLabel.setText("目录: -")
         self.DocsLabel.setText("文档: -")
         self.AuthorLabel.setText("作者: -")
         self.CategoryLabel.setText("分类: -")
@@ -605,6 +660,36 @@ class MainWindow(QMainWindow):
         else:
             QMessageBox.warning(self, "错误", "删除插件失败")
 
+    def OnFixFolder(self):
+        """修正文件夹名称"""
+        if not hasattr(self, "CurPluginName"):
+            return
+
+        Plugin = self.Manager.GetPluginByName(self.CurPluginName, self.CurSource)
+        if not Plugin:
+            return
+
+        OldName = Plugin.Path.name
+        NewName = Plugin.Name
+
+        Reply = QMessageBox.question(
+            self, "确认修正",
+            f"将目录重命名为插件同名：\n\n{OldName}\n→ {NewName}\n\n是否继续？",
+            QMessageBox.Yes | QMessageBox.Cancel
+        )
+
+        if Reply != QMessageBox.Yes:
+            return
+
+        if self.Manager.RenamePluginFolder(self.CurPluginName, self.CurSource):
+            # 更新目录显示
+            self.FolderLabel.setText(f"目录: {Plugin.Path.name}")
+            self.CurPluginPath = Plugin.Path
+            self.FixFolderBtn.setEnabled(False)
+            QMessageBox.information(self, "成功", "目录已修正")
+        else:
+            QMessageBox.warning(self, "错误", "修正目录失败")
+
     def OnOpenFolder(self):
         """打开插件目录"""
         if not hasattr(self, "CurPluginPath"):
@@ -647,3 +732,30 @@ class MainWindow(QMainWindow):
         if PrevPluginName:
             self.CurPluginName = PrevPluginName
         self.TryReselectOrFirst()
+
+    def OnCloseProject(self):
+        """关闭项目（尝试关闭 UE 编辑器）"""
+        if not self.Manager.ProjectInfo:
+            return
+
+        import subprocess
+        ProjectName = self.Manager.ProjectInfo.Name
+
+        Reply = QMessageBox.question(
+            self, "关闭项目",
+            f"将尝试关闭 UE 编辑器中的项目 {ProjectName}。\n\n"
+            f"请确保已保存所有更改，是否继续？",
+            QMessageBox.Yes | QMessageBox.Cancel
+        )
+
+        if Reply != QMessageBox.Yes:
+            return
+
+        # 尝试关闭包含项目名的 UE 编辑器进程
+        try:
+            subprocess.run(
+                f'taskkill /FI "WINDOWTITLE eq {ProjectName}*" /IM UnrealEditor.exe',
+                shell=True, capture_output=True
+            )
+        except Exception:
+            pass

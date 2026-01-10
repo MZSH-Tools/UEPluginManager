@@ -260,6 +260,33 @@ class PluginManager:
                     break
         return len(FoundSources) > 1
 
+    def RenamePluginFolder(self, Name: str, Source: PluginSource) -> bool:
+        """重命名插件文件夹为插件同名"""
+        Plugin = self.GetPluginByName(Name, Source)
+        if not Plugin:
+            return False
+
+        OldPath = Plugin.Path
+        NewPath = OldPath.parent / Name
+
+        # 已经是正确名称
+        if OldPath.name == Name:
+            return True
+
+        # 目标路径已存在
+        if NewPath.exists():
+            print(f"目标路径已存在: {NewPath}")
+            return False
+
+        try:
+            OldPath.rename(NewPath)
+            # 更新内存中的路径
+            Plugin.Path = NewPath
+            return True
+        except Exception as E:
+            print(f"重命名插件文件夹失败: {E}")
+            return False
+
     def DeletePlugin(self, Name: str, Source: PluginSource) -> bool:
         """删除插件（移动到回收站）"""
         import shutil
