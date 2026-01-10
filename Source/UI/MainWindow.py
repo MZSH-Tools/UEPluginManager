@@ -148,7 +148,6 @@ class MainWindow(QMainWindow):
         self.PluginTree = QTreeWidget()
         self.PluginTree.setHeaderLabels(["名称", "作者", "分类", "状态"])
         self.PluginTree.setRootIsDecorated(False)
-        self.PluginTree.setAlternatingRowColors(True)
         self.PluginTree.setSortingEnabled(True)
         self.PluginTree.sortByColumn(0, Qt.AscendingOrder)
         self.PluginTree.itemSelectionChanged.connect(self.OnPluginSelected)
@@ -221,7 +220,7 @@ class MainWindow(QMainWindow):
         # 启用控制
         ControlLayout = QHBoxLayout()
         self.EnabledCheck = QCheckBox("在项目中启用")
-        self.EnabledCheck.stateChanged.connect(self.OnEnabledChanged)
+        self.EnabledCheck.clicked.connect(self.OnEnabledClicked)
         ControlLayout.addWidget(self.EnabledCheck)
 
         self.OpenFolderBtn = QPushButton("打开目录")
@@ -385,15 +384,13 @@ class MainWindow(QMainWindow):
         Dependents = self.Manager.GetDependents(Plugin.Name, self.CurSource)
         self.DependentsEdit.setText(", ".join(Dependents) if Dependents else "无")
 
-        # 启用状态
-        self.EnabledCheck.blockSignals(True)
+        # 启用状态（clicked 信号只响应用户点击，程序修改不会触发）
         if Plugin.EnabledInProject is True:
             self.EnabledCheck.setChecked(True)
         elif Plugin.EnabledInProject is False:
             self.EnabledCheck.setChecked(False)
         else:
             self.EnabledCheck.setChecked(Plugin.EnabledByDefault)
-        self.EnabledCheck.blockSignals(False)
 
         # 保存当前插件名
         self.CurPluginName = Plugin.Name
@@ -410,22 +407,18 @@ class MainWindow(QMainWindow):
         self.DescriptionEdit.setText("")
         self.DependenciesEdit.setText("")
         self.DependentsEdit.setText("")
-        self.EnabledCheck.blockSignals(True)
         self.EnabledCheck.setChecked(False)
-        self.EnabledCheck.blockSignals(False)
         if hasattr(self, "CurPluginName"):
             del self.CurPluginName
         if hasattr(self, "CurPluginPath"):
             del self.CurPluginPath
 
-    def OnEnabledChanged(self, State: int):
-        """启用状态变更"""
+    def OnEnabledClicked(self, Checked: bool):
+        """用户点击启用复选框"""
         if not hasattr(self, "CurPluginName"):
             return
 
-        Enabled = Qt.CheckState(State) == Qt.CheckState.Checked
-
-        if Enabled:
+        if Checked:
             self.EnablePluginWithDeps(self.CurPluginName, self.CurSource)
         else:
             self.DisablePluginWithDeps(self.CurPluginName, self.CurSource)
@@ -472,14 +465,12 @@ class MainWindow(QMainWindow):
         """恢复复选框状态"""
         Plugin = self.Manager.GetPluginByName(PluginName, Source)
         if Plugin:
-            self.EnabledCheck.blockSignals(True)
             if Plugin.EnabledInProject is True:
                 self.EnabledCheck.setChecked(True)
             elif Plugin.EnabledInProject is False:
                 self.EnabledCheck.setChecked(False)
             else:
                 self.EnabledCheck.setChecked(Plugin.EnabledByDefault)
-            self.EnabledCheck.blockSignals(False)
 
     def ApplyPluginChanges(self, Plugins: list, Enabled: bool):
         """批量应用插件状态变更"""
