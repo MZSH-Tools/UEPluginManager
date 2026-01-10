@@ -52,29 +52,35 @@ class PluginManager:
         return self.FilteredPlugins[Source]
 
     def Search(self, Keyword: str, Field: int = 0):
-        """搜索插件，Field: 0名称 1作者 2分类 3描述 4依赖 5被依赖"""
-        if not Keyword:
+        """搜索插件，Field: 0名称 1作者 2分类 3描述 4依赖 5被依赖，支持空格分隔多关键词"""
+        if not Keyword or not Keyword.strip():
             for Source in PluginSource:
                 self.FilteredPlugins[Source] = self.Plugins[Source].copy()
         else:
-            Keyword = Keyword.lower()
+            Keywords = [K.lower() for K in Keyword.split() if K]
             for Source in PluginSource:
                 self.FilteredPlugins[Source] = []
                 for P in self.Plugins[Source]:
-                    Match = False
                     if Field == 0:
-                        Match = Keyword in P.Name.lower()
+                        Text = P.Name.lower()
+                        Match = all(K in Text for K in Keywords)
                     elif Field == 1:
-                        Match = Keyword in P.CreatedBy.lower()
+                        Text = P.CreatedBy.lower()
+                        Match = all(K in Text for K in Keywords)
                     elif Field == 2:
-                        Match = Keyword in P.Category.lower()
+                        Text = P.Category.lower()
+                        Match = all(K in Text for K in Keywords)
                     elif Field == 3:
-                        Match = Keyword in P.Description.lower()
+                        Text = P.Description.lower()
+                        Match = all(K in Text for K in Keywords)
                     elif Field == 4:
-                        Match = any(Keyword in Dep.lower() for Dep in P.Plugins)
+                        Deps = " ".join(P.Plugins).lower()
+                        Match = all(K in Deps for K in Keywords)
                     elif Field == 5:
-                        Dependents = [Name for Name, _ in self.GetAllDependents(P.Name)]
-                        Match = any(Keyword in Dep.lower() for Dep in Dependents)
+                        Dependents = " ".join(Name for Name, _ in self.GetAllDependents(P.Name)).lower()
+                        Match = all(K in Dependents for K in Keywords)
+                    else:
+                        Match = False
                     if Match:
                         self.FilteredPlugins[Source].append(P)
 
